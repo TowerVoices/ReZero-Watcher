@@ -2,6 +2,8 @@ import json
 import os
 import requests
 import yt_dlp
+import time
+import random
 from dotenv import load_dotenv
 
 # تحميل متغيرات البيئة
@@ -35,14 +37,19 @@ class SilentLogger(object):
     def error(self, msg):
         pass
 
-# الإعدادات العامة لـ yt_dlp لمنع أي نصوص غير مرغوب فيها
+# ==========================================
+# إعدادات yt_dlp
+# ==========================================
 YTDLP_OPTS = {
     "quiet": True,
     "no_warnings": True,
     "skip_download": True,
     "extract_flat": True,
     "logger": SilentLogger(), 
-    "cookiefile": "cookies.txt"
+    "cookiefile": "cookies.txt",
+    "sleep_interval_requests": 2, 
+    "sleep_interval": 3,
+    "max_sleep_interval": 7
 }
 
 # ==========================================
@@ -54,21 +61,13 @@ def clear_screen():
 
 def send_discord(message):
     webhook = os.getenv("DISCORD_WEBHOOK_URL")
-
     if not webhook:
         return
-
     try:
-        r = requests.post(
-            webhook,
-            json={"content": message},
-            timeout=15
-        )
-
+        r = requests.post(webhook, json={"content": message}, timeout=15)
         if r.status_code >= 400:
             print("Discord Error:", r.status_code)
             print(r.text)
-
     except Exception as e:
         print("Discord Exception:", e)
 
@@ -79,7 +78,6 @@ def load_watchlist():
     with open(WATCHLIST, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def load_database(name):
     os.makedirs(DATABASE, exist_ok=True)
     path = os.path.join(DATABASE, f"{name}.json")
@@ -88,12 +86,12 @@ def load_database(name):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def save_database(name, data):
     os.makedirs(DATABASE, exist_ok=True)
     path = os.path.join(DATABASE, f"{name}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
 def check_video_status(video_id):
     global cookies_alert_sent
 
@@ -102,89 +100,35 @@ def check_video_status(video_id):
 
     try:
         with yt_dlp.YoutubeDL(single_opts) as ydl:
-            ydl.extract_info(
-                f"https://youtu.be/{video_id}",
-                download=False
-            )
+            ydl.extract_info(f"https://youtu.be/{video_id}", download=False)
         return "Public"
 
     except Exception as e:
-        text = str(e)
-        text_lower = text.lower()
+        text = str(e).lower()
 
-        # ==========================================
-        # 1. انتهاء الكوكيز أو منع يوتيوب
-        # ==========================================
-        if (
-            "sign in to confirm you're not a bot" in text_lower
-            or "cookie file is not in netscape format" in text_lower
-            or "cookies are no longer valid" in text_lower
-        ):
+        if "sign in to confirm you're not a bot" in text or "cookie file is not in netscape format" in text or "cookies are no longer valid" in text:
             if not cookies_alert_sent:
                 send_discord(
-                    "🚨 **YouTube Session Expired**\n\n"
-                    "The cookies.txt session is no longer valid.\n"
-                    "Please export a new cookies.txt and update the "
-                    "YOUTUBE_COOKIES GitHub Secret."
+                    "🚨 **YouTube Session Expired / Bot Detected**\n\n"
+                    "The current session is blocked by CAPTCHA or expired.\n"
+                    "Please update your YOUTUBE_COOKIES."
                 )
                 cookies_alert_sent = True
-
             return "Cookies Expired"
 
-        # ==========================================
-        # 2. الحالات المعروفة
-        # ==========================================
-        if "private" in text_lower:
-            return "Private"
-
-        elif (
-            "unavailable" in text_lower
-            or "copyright" in text_lower
-            or "country" in text_lower
-            or "age-restricted" in text_lower
-            or "login required" in text_lower
-        ):
-            return "Unavailable"
-
-        elif "members" in text_lower:
-            return "Members"
-
-        # ==========================================
-        # 3. أخطاء مؤقتة
-        # ==========================================
-        if (
-            "429" in text_lower
-            or "too many requests" in text_lower
-        ):
-            return "Rate Limited"
-
-        elif (
-            "network" in text_lower
-            or "timeout" in text_lower
-            or "urlopen error" in text_lower
-        ):
-            return "Network Error"
-
-        # ==========================================
-        # 4. أي خطأ آخر (للتشخيص)
-        # ==========================================
-        print("=" * 80)
-        print(f"[DEBUG] Video ID: {video_id}")
-        print(text)
-        print("=" * 80)
+        if "private" in text: return "Private"
+        elif "unavailable" in text or "copyright" in text or "country" in text or "age-restricted" in text or "login required" in text: return "Unavailable"
+        elif "members" in text: return "Members"
+        elif "429" in text or "too many requests" in text: return "Rate Limited"
+        elif "network" in text or "timeout" in text or "urlopen error" in text: return "Network Error"
 
         return "Unknown Error"
+
 def scan_playlist(name, url):
-    print(
-        f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} "
-        f"{Color.BOLD}{name}{Color.RESET} ... ",
-        end="",
-        flush=True
-    )
+    print(f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} {Color.BOLD}{name}{Color.RESET} ... \n", end="", flush=True)
 
     old = load_database(name)
     old_ids = {x["id"] for x in old}
-
     current = []
 
     try:
@@ -194,9 +138,10 @@ def scan_playlist(name, url):
         if "entries" not in info:
             raise Exception("Playlist has no entries.")
 
-        for entry in info["entries"]:
+        total_videos = len(info["entries"])
+        
+        for index, entry in enumerate(info["entries"]):
             video_id = entry.get("id")
-
             if not video_id:
                 continue
 
@@ -204,26 +149,40 @@ def scan_playlist(name, url):
             if not title or str(title).strip() == "":
                 title = "Unknown Title"
 
-            status = check_video_status(video_id)
+            print(f" ⏳ Checking ({index+1}/{total_videos}): {video_id} ... ", end="", flush=True)
 
-            # التوقف فوراً إذا انتهت الكوكيز
-            if status == "Cookies Expired":
-                print(f"{Color.RED}Cookies expired. Scan aborted.{Color.RESET}")
-                return
+            # ==================================================
+            # المنطق الجديد: التحقق من حالة الفيديو في قاعدة البيانات
+            # ==================================================
+            old_video_data = next((x for x in old if x["id"] == video_id), None)
 
-            # ==========================================
-            # الإصلاح: منع الإشعارات الكاذبة لأخطاء الشبكة والسكربت
-            # ==========================================
-            if status in ["Rate Limited", "Network Error", "Unknown Error"]:
-                # نجلب الحالة القديمة للفيديو من قاعدة البيانات (إن وجدت)
-                old_video_data = next((x for x in old if x["id"] == video_id), None)
-                if old_video_data:
-                    # نحتفظ بالحالة السابقة ولن نغيرها إلى Unknown
-                    status = old_video_data.get("status", status)
-                else:
-                    # إذا كان فيديو جديد تماماً وحدث خطأ شبكة أثناء فحصه
-                    status = "Unknown" 
-            # ==========================================
+            # إذا كان الفيديو موجوداً وحالته السابقة Public، نتخطى الفحص تماماً
+            if old_video_data and old_video_data.get("status") == "Public":
+                status = "Public"
+                print(f"[{Color.GREEN}{status}{Color.RESET}] (Skipped - Already Public)")
+            else:
+                # فيديو جديد أو حالته السابقة ليست Public، نقوم بطلب فحصه
+                status = check_video_status(video_id)
+
+                # التوقف فوراً إذا انتهت الكوكيز
+                if status == "Cookies Expired":
+                    print(f"{Color.RED}Bot Blocked! Scan aborted.{Color.RESET}")
+                    return
+
+                # منع الإشعارات الكاذبة لأخطاء الشبكة والسكربت
+                if status in ["Rate Limited", "Network Error", "Unknown Error"]:
+                    if old_video_data:
+                        status = old_video_data.get("status", status)
+                    else:
+                        status = "Unknown" 
+
+                print(f"[{status}]")
+
+                # تأخير عشوائي فقط إذا قمنا بإرسال طلب فعلي ليوتيوب
+                if index < total_videos - 1:
+                    sleep_time = random.uniform(3, 6)
+                    time.sleep(sleep_time)
+            # ==================================================
 
             current.append({
                 "id": video_id,
@@ -234,15 +193,10 @@ def scan_playlist(name, url):
     except Exception as e:
         print(f"{Color.RED}Failed!{Color.RESET}")
         print(e)
-
-        send_discord(
-            f"❌ **Playlist Scan Failed**\n\n"
-            f"**Playlist:** {name}\n\n"
-            f"**Reason:**\n```{e}```"
-        )
+        send_discord(f"❌ **Playlist Scan Failed**\n\n**Playlist:** {name}\n\n**Reason:**\n```{e}```")
         return
 
-    print(f"{Color.GREEN}Done! ({len(current)} videos){Color.RESET}")
+    print(f"\n{Color.GREEN}Done! ({len(current)} videos){Color.RESET}\n")
 
     new_ids = {x["id"] for x in current}
     changes = 0
@@ -251,74 +205,34 @@ def scan_playlist(name, url):
     for video in current:
         if video["id"] not in old_ids:
             changes += 1
-            print(
-                f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} "
-                f"{video['title'][:50]}... ({video['status']})"
-            )
-            send_discord(
-                f"🟢 **New Video**\n\n"
-                f"**Playlist:** {name}\n"
-                f"**Status:** {video['status']}\n\n"
-                f"**Title:**\n{video['title']}\n\n"
-                f"**ID:**\n{video['id']}\n\n"
-                f"https://youtu.be/{video['id']}"
-            )
+            print(f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} {video['title'][:50]}... ({video['status']})")
+            send_discord(f"🟢 **New Video**\n\n**Playlist:** {name}\n**Status:** {video['status']}\n\n**Title:**\n{video['title']}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
 
     # تغير الحالة
     for video in current:
-        old_video = next(
-            (x for x in old if x["id"] == video["id"]),
-            None
-        )
-
-        if old_video is None:
-            continue
+        old_video = next((x for x in old if x["id"] == video["id"]), None)
+        if not old_video: continue
 
         old_status = old_video.get("status", "Unknown")
         new_status = video["status"]
 
         if old_status != new_status:
             changes += 1
-            print(
-                f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} "
-                f"{video['title'][:50]}... "
-                f"[{old_status} ➜ {new_status}]"
-            )
-            send_discord(
-                f"🟡 **Video Status Changed**\n\n"
-                f"**Playlist:** {name}\n\n"
-                f"**Title:**\n{video['title']}\n\n"
-                f"**ID:**\n{video['id']}\n\n"
-                f"**Status:**\n"
-                f"{old_status} ➜ {new_status}\n\n"
-                f"https://youtu.be/{video['id']}"
-            )
+            print(f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} {video['title'][:50]}... [{old_status} ➜ {new_status}]")
+            send_discord(f"🟡 **Video Status Changed**\n\n**Playlist:** {name}\n\n**Title:**\n{video['title']}\n\n**ID:**\n{video['id']}\n\n**Status:**\n{old_status} ➜ {new_status}\n\nhttps://youtu.be/{video['id']}")
 
-    # فيديوهات محذوفة
+    # فيديوهات محذوفة (الفيديو اختفى من القائمة)
     for video in old:
         if video["id"] not in new_ids:
             changes += 1
-            print(
-                f"  {Color.RED}[-] REMOVED:{Color.RESET} "
-                f"{video['title'][:50]}... "
-                f"(Was: {video.get('status', 'Unknown')})"
-            )
-            send_discord(
-                f"🔴 **Video Removed**\n\n"
-                f"**Playlist:** {name}\n\n"
-                f"**Last Status:** "
-                f"{video.get('status', 'Unknown')}\n\n"
-                f"**Title:**\n{video['title']}\n\n"
-                f"**ID:**\n{video['id']}\n\n"
-                f"https://youtu.be/{video['id']}"
-            )
+            print(f"  {Color.RED}[-] REMOVED:{Color.RESET} {video['title'][:50]}... (Was: {video.get('status', 'Unknown')})")
+            send_discord(f"🔴 **Video Removed**\n\n**Playlist:** {name}\n\n**Last Status:** {video.get('status', 'Unknown')}\n\n**Title:**\n{video['title']}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
 
     if changes == 0:
         print(f"  {Color.BLUE}✓ No changes detected.{Color.RESET}")
 
     print("-" * 50)
     save_database(name, current)
-
 
 def run():
     print(f"\n{Color.BOLD}Starting Playlist Inspection...{Color.RESET}\n")
@@ -333,13 +247,11 @@ def run():
 
     for playlist in playlists:
         playlist_id = playlist.get("playlist_id")
-        if not playlist_id:
-            continue
+        if not playlist_id: continue
         url = f"https://www.youtube.com/playlist?list={playlist_id}"
         scan_playlist(playlist["name"], url)
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ All playlists scanned successfully!{Color.RESET}\n")
-
 
 def export_ids():
     watchlist = load_watchlist()
@@ -348,32 +260,23 @@ def export_ids():
     os.makedirs("output", exist_ok=True)
     filename = "output/all_ids.txt"
 
-    print(f"\n{Color.CYAN}Exporting IDs to {filename}...{Color.RESET}\n")
+    print(f"\n{Color.CYAN}Exporting IDs to {filename} (Using Local Database)...{Color.RESET}\n")
 
     with open(filename, "w", encoding="utf-8") as out:
         for playlist in playlists:
             print(f"{Color.YELLOW}Exporting:{Color.RESET} {playlist['name']} ", end="", flush=True)
             
-            playlist_id = playlist["playlist_id"]
-            url = f"https://www.youtube.com/playlist?list={playlist_id}"
-
-            with yt_dlp.YoutubeDL(YTDLP_OPTS) as ydl:
-                info = ydl.extract_info(url, download=False)
-
             out.write(f"{playlist['name']}\n")
             out.write("=" * 60 + "\n")
 
-            if "entries" in info:
-                for video in info["entries"]:
+            # قراءة البيانات المحفوظة محلياً لعدم إرسال طلبات جديدة وتجنب الحظر
+            local_data = load_database(playlist['name'])
+            
+            if local_data:
+                for video in local_data:
+                    status = video.get("status", "Unknown")
                     video_id = video.get("id")
-                    if not video_id:
-                        continue
-                        
-                    status = check_video_status(video_id)
-                    # معالجة الرموز للأخطاء العابرة عند التصدير
-                    if status in ["Rate Limited", "Network Error", "Unknown Error"]:
-                        status = "Unknown"
-
+                    
                     if status == "Public": icon = "🟢"
                     elif status == "Private": icon = "🔒"
                     elif status == "Unavailable": icon = "⚫"
@@ -382,16 +285,15 @@ def export_ids():
 
                     line = f"{video_id:<15} {icon} {status}"
                     out.write(line + "\n")
-            
+            else:
+                out.write("No videos scanned yet. Please run scanner first.\n")
+
             out.write("\n")
             print(f"{Color.GREEN}✔ Done!{Color.RESET}")
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
 
 
-# ==========================================
-# واجهة المستخدم (القائمة الرئيسية)
-# ==========================================
 if __name__ == "__main__":
     if os.getenv("GITHUB_ACTIONS") == "true":
         run()
