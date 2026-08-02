@@ -169,8 +169,16 @@ def scan_playlist(name, url):
             if not video_id:
                 continue
 
-            title = entry.get("title", "Unknown Title")
+            title = entry.get("title")
+            if not title or str(title).strip() == "":
+                title = "Unknown Title"
+
             status = check_video_status(video_id)
+
+            # إذا انتهت الكوكيز نوقف الفحص مباشرة
+            if status == "Cookies Expired":
+                print(f"{Color.RED}Cookies expired. Scan aborted.{Color.RESET}")
+                return
 
             current.append({
                 "id": video_id,
