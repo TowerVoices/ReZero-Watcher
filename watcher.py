@@ -10,6 +10,8 @@ load_dotenv()
 WATCHLIST = "watchlist.json"
 DATABASE = "database"
 
+cookies_alert_sent = False
+
 # ==========================================
 # 1. إعدادات الألوان لتجميل الشاشة (Console)
 # ==========================================
@@ -39,7 +41,8 @@ YTDLP_OPTS = {
     "no_warnings": True,
     "skip_download": True,
     "extract_flat": True,
-    "logger": SilentLogger()  # هنا نستخدم الكاتم
+    "logger": SilentLogger(), 
+    "cookiefile": "cookies.txt"
 }
 
 # ==========================================
@@ -94,6 +97,7 @@ def save_database(name, data):
 
 
 def check_video_status(video_id):
+    global cookies_alert_sent
     # نستخدم إعدادات صامتة مخصصة لفحص فيديو واحد
     single_opts = YTDLP_OPTS.copy()
     single_opts["extract_flat"] = False 
@@ -104,14 +108,36 @@ def check_video_status(video_id):
         return "Public"
     except Exception as e:
         text = str(e)
-        print(text)
-        if "Private video" in text or "private" in text.lower():
-            return "Private"
-        elif "Video unavailable" in text or "unavailable" in text.lower():
-            return "Unavailable"
-        elif "Members only" in text or "members" in text.lower():
-            return "Members"
-        return "Unknown"
+       
+    text = str(e)
+    print(text)
+
+    if (
+        "Sign in to confirm you're not a bot" in text
+        or "cookies" in text.lower()
+    ):
+
+        if not cookies_alert_sent:
+            send_discord(
+                "🚨 **YouTube Session Expired**\n\n"
+                "The cookies.txt session is no longer valid.\n"
+                "Please export a new cookies.txt and update the YOUTUBE_COOKIES GitHub Secret."
+            )
+            cookies_alert_sent = True
+
+        return "Cookies Expired"
+
+    if "Private video" in text or "private" in text.lower():
+        return "Private"
+
+    elif "Video unavailable" in text or "unavailable" in text.lower():
+        return "Unavailable"
+
+    elif "Members only" in text or "members" in text.lower():
+        return "Members"
+
+    return "Unknown"
+     
 
 
 def scan_playlist(name, url):
