@@ -25,6 +25,5 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Watcher
-        working-directory: VideoInspector
         run: |
           python watcher.py
