@@ -95,48 +95,53 @@ def save_database(name, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
-
 def check_video_status(video_id):
     global cookies_alert_sent
-    # نستخدم إعدادات صامتة مخصصة لفحص فيديو واحد
+
     single_opts = YTDLP_OPTS.copy()
-    single_opts["extract_flat"] = False 
+    single_opts["extract_flat"] = False
 
     try:
         with yt_dlp.YoutubeDL(single_opts) as ydl:
-            ydl.extract_info(f"https://youtu.be/{video_id}", download=False)
-        return "Public"
-    except Exception as e:
-        text = str(e)
-       
-    text = str(e)
-    print(text)
-
-    if (
-        "Sign in to confirm you're not a bot" in text
-        or "cookies" in text.lower()
-    ):
-
-        if not cookies_alert_sent:
-            send_discord(
-                "🚨 **YouTube Session Expired**\n\n"
-                "The cookies.txt session is no longer valid.\n"
-                "Please export a new cookies.txt and update the YOUTUBE_COOKIES GitHub Secret."
+            ydl.extract_info(
+                f"https://youtu.be/{video_id}",
+                download=False
             )
-            cookies_alert_sent = True
 
-        return "Cookies Expired"
+        return "Public"
 
-    if "Private video" in text or "private" in text.lower():
-        return "Private"
+    except Exception as e:
 
-    elif "Video unavailable" in text or "unavailable" in text.lower():
-        return "Unavailable"
+        text = str(e)
+        print(text)
 
-    elif "Members only" in text or "members" in text.lower():
-        return "Members"
+        if (
+            "Sign in to confirm you're not a bot" in text
+            or "cookies" in text.lower()
+        ):
 
-    return "Unknown"
+            if not cookies_alert_sent:
+                send_discord(
+                    "🚨 **YouTube Session Expired**\n\n"
+                    "The cookies.txt session is no longer valid.\n"
+                    "Please export a new cookies.txt and update the "
+                    "YOUTUBE_COOKIES GitHub Secret."
+                )
+
+                cookies_alert_sent = True
+
+            return "Cookies Expired"
+
+        if "Private video" in text or "private" in text.lower():
+            return "Private"
+
+        elif "Video unavailable" in text or "unavailable" in text.lower():
+            return "Unavailable"
+
+        elif "Members only" in text or "members" in text.lower():
+            return "Members"
+
+        return "Unknown"
      
 def scan_playlist(name, url):
     print(
