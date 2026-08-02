@@ -94,7 +94,6 @@ def save_database(name, data):
     path = os.path.join(DATABASE, f"{name}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
-
 def check_video_status(video_id):
     global cookies_alert_sent
 
@@ -107,19 +106,19 @@ def check_video_status(video_id):
                 f"https://youtu.be/{video_id}",
                 download=False
             )
-
         return "Public"
 
     except Exception as e:
-
         text = str(e)
-        print(text)
+        text_lower = text.lower()
 
+        # ==========================================
+        # 1. انتهاء الكوكيز أو طلب تسجيل الدخول
+        # ==========================================
         if (
-            "Sign in to confirm you're not a bot" in text
-            or "cookies" in text.lower()
+            "sign in to confirm you're not a bot" in text_lower
+            or "cookies" in text_lower
         ):
-
             if not cookies_alert_sent:
                 send_discord(
                     "🚨 **YouTube Session Expired**\n\n"
@@ -127,21 +126,49 @@ def check_video_status(video_id):
                     "Please export a new cookies.txt and update the "
                     "YOUTUBE_COOKIES GitHub Secret."
                 )
-
                 cookies_alert_sent = True
 
             return "Cookies Expired"
 
-        if "Private video" in text or "private" in text.lower():
+        # ==========================================
+        # 2. الحالات المعروفة
+        # ==========================================
+        if "private" in text_lower:
             return "Private"
 
-        elif "Video unavailable" in text or "unavailable" in text.lower():
+        elif (
+            "unavailable" in text_lower
+            or "copyright" in text_lower
+            or "country" in text_lower
+            or "age-restricted" in text_lower
+            or "login required" in text_lower
+        ):
             return "Unavailable"
 
-        elif "Members only" in text or "members" in text.lower():
+        elif "members" in text_lower:
             return "Members"
 
-        return "Unknown"
+        # ==========================================
+        # 3. أخطاء مؤقتة (لا نغيّر الحالة بسببها)
+        # ==========================================
+        if (
+            "429" in text_lower
+            or "too many requests" in text_lower
+        ):
+            return "Rate Limited"
+
+        elif (
+            "network" in text_lower
+            or "timeout" in text_lower
+            or "urlopen error" in text_lower
+        ):
+            return "Network Error"
+
+        # ==========================================
+        # 4. أي خطأ آخر
+        # ==========================================
+        # print(f"[DEBUG] {video_id}: {text}")
+        return "Unknown Error"
      
 def scan_playlist(name, url):
     print(
@@ -175,10 +202,24 @@ def scan_playlist(name, url):
 
             status = check_video_status(video_id)
 
-            # إذا انتهت الكوكيز نوقف الفحص مباشرة
+            # التوقف فوراً إذا انتهت الكوكيز
             if status == "Cookies Expired":
                 print(f"{Color.RED}Cookies expired. Scan aborted.{Color.RESET}")
                 return
+
+            # ==========================================
+            # الإصلاح: منع الإشعارات الكاذبة لأخطاء الشبكة والسكربت
+            # ==========================================
+            if status in ["Rate Limited", "Network Error", "Unknown Error"]:
+                # نجلب الحالة القديمة للفيديو من قاعدة البيانات (إن وجدت)
+                old_video_data = next((x for x in old if x["id"] == video_id), None)
+                if old_video_data:
+                    # نحتفظ بالحالة السابقة ولن نغيرها إلى Unknown
+                    status = old_video_data.get("status", status)
+                else:
+                    # إذا كان فيديو جديد تماماً وحدث خطأ شبكة أثناء فحصه
+                    status = "Unknown" 
+            # ==========================================
 
             current.append({
                 "id": video_id,
@@ -195,7 +236,6 @@ def scan_playlist(name, url):
             f"**Playlist:** {name}\n\n"
             f"**Reason:**\n```{e}```"
         )
-
         return
 
     print(f"{Color.GREEN}Done! ({len(current)} videos){Color.RESET}")
@@ -206,14 +246,11 @@ def scan_playlist(name, url):
     # فيديوهات جديدة
     for video in current:
         if video["id"] not in old_ids:
-
             changes += 1
-
             print(
                 f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} "
                 f"{video['title'][:50]}... ({video['status']})"
             )
-
             send_discord(
                 f"🟢 **New Video**\n\n"
                 f"**Playlist:** {name}\n"
@@ -225,7 +262,6 @@ def scan_playlist(name, url):
 
     # تغير الحالة
     for video in current:
-
         old_video = next(
             (x for x in old if x["id"] == video["id"]),
             None
@@ -238,15 +274,12 @@ def scan_playlist(name, url):
         new_status = video["status"]
 
         if old_status != new_status:
-
             changes += 1
-
             print(
                 f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} "
                 f"{video['title'][:50]}... "
                 f"[{old_status} ➜ {new_status}]"
             )
-
             send_discord(
                 f"🟡 **Video Status Changed**\n\n"
                 f"**Playlist:** {name}\n\n"
@@ -259,17 +292,13 @@ def scan_playlist(name, url):
 
     # فيديوهات محذوفة
     for video in old:
-
         if video["id"] not in new_ids:
-
             changes += 1
-
             print(
                 f"  {Color.RED}[-] REMOVED:{Color.RESET} "
                 f"{video['title'][:50]}... "
                 f"(Was: {video.get('status', 'Unknown')})"
             )
-
             send_discord(
                 f"🔴 **Video Removed**\n\n"
                 f"**Playlist:** {name}\n\n"
@@ -284,7 +313,6 @@ def scan_playlist(name, url):
         print(f"  {Color.BLUE}✓ No changes detected.{Color.RESET}")
 
     print("-" * 50)
-
     save_database(name, current)
 
 
@@ -338,6 +366,9 @@ def export_ids():
                         continue
                         
                     status = check_video_status(video_id)
+                    # معالجة الرموز للأخطاء العابرة عند التصدير
+                    if status in ["Rate Limited", "Network Error", "Unknown Error"]:
+                        status = "Unknown"
 
                     if status == "Public": icon = "🟢"
                     elif status == "Private": icon = "🔒"
