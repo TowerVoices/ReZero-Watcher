@@ -138,35 +138,51 @@ def check_video_status(video_id):
 
     return "Unknown"
      
-
-
 def scan_playlist(name, url):
-    print(f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} {Color.BOLD}{name}{Color.RESET} ... ", end="", flush=True)
-    
+    print(
+        f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} "
+        f"{Color.BOLD}{name}{Color.RESET} ... ",
+        end="",
+        flush=True
+    )
+
     old = load_database(name)
     old_ids = {x["id"] for x in old}
 
     current = []
+
     try:
         with yt_dlp.YoutubeDL(YTDLP_OPTS) as ydl:
             info = ydl.extract_info(url, download=False)
-            
-            if "entries" in info:
-                for entry in info["entries"]:
-                    video_id = entry.get("id")
-                    if not video_id:
-                        continue
-                    
-                    title = entry.get("title", "Unknown Title")
-                    status = check_video_status(video_id)
-                    
-                    current.append({
-                        "id": video_id,
-                        "title": title,
-                        "status": status
-                    })
+
+        if "entries" not in info:
+            raise Exception("Playlist has no entries.")
+
+        for entry in info["entries"]:
+            video_id = entry.get("id")
+
+            if not video_id:
+                continue
+
+            title = entry.get("title", "Unknown Title")
+            status = check_video_status(video_id)
+
+            current.append({
+                "id": video_id,
+                "title": title,
+                "status": status
+            })
+
     except Exception as e:
         print(f"{Color.RED}Failed!{Color.RESET}")
+        print(e)
+
+        send_discord(
+            f"❌ **Playlist Scan Failed**\n\n"
+            f"**Playlist:** {name}\n\n"
+            f"**Reason:**\n```{e}```"
+        )
+
         return
 
     print(f"{Color.GREEN}Done! ({len(current)} videos){Color.RESET}")
@@ -174,13 +190,19 @@ def scan_playlist(name, url):
     new_ids = {x["id"] for x in current}
     changes = 0
 
-    # 1. فيديوهات جديدة
+    # فيديوهات جديدة
     for video in current:
         if video["id"] not in old_ids:
+
             changes += 1
-            print(f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} {video['title'][:50]}... ({video['status']})")
+
+            print(
+                f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} "
+                f"{video['title'][:50]}... ({video['status']})"
+            )
+
             send_discord(
-                f"🟢 **New Video**\n"
+                f"🟢 **New Video**\n\n"
                 f"**Playlist:** {name}\n"
                 f"**Status:** {video['status']}\n\n"
                 f"**Title:**\n{video['title']}\n\n"
@@ -188,9 +210,14 @@ def scan_playlist(name, url):
                 f"https://youtu.be/{video['id']}"
             )
 
-    # 2. تغير الحالة
+    # تغير الحالة
     for video in current:
-        old_video = next((x for x in old if x["id"] == video["id"]), None)
+
+        old_video = next(
+            (x for x in old if x["id"] == video["id"]),
+            None
+        )
+
         if old_video is None:
             continue
 
@@ -198,26 +225,43 @@ def scan_playlist(name, url):
         new_status = video["status"]
 
         if old_status != new_status:
+
             changes += 1
-            print(f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} {video['title'][:50]}... [{old_status} ➔ {new_status}]")
+
+            print(
+                f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} "
+                f"{video['title'][:50]}... "
+                f"[{old_status} ➜ {new_status}]"
+            )
+
             send_discord(
-                f"🟡 **Video Status Changed**\n"
+                f"🟡 **Video Status Changed**\n\n"
                 f"**Playlist:** {name}\n\n"
                 f"**Title:**\n{video['title']}\n\n"
                 f"**ID:**\n{video['id']}\n\n"
-                f"**Status:**\n{old_status} ➜ {new_status}\n\n"
+                f"**Status:**\n"
+                f"{old_status} ➜ {new_status}\n\n"
                 f"https://youtu.be/{video['id']}"
             )
 
-    # 3. فيديوهات محذوفة
+    # فيديوهات محذوفة
     for video in old:
+
         if video["id"] not in new_ids:
+
             changes += 1
-            print(f"  {Color.RED}[-] REMOVED:{Color.RESET} {video['title'][:50]}... (Was: {video.get('status', 'Unknown')})")
+
+            print(
+                f"  {Color.RED}[-] REMOVED:{Color.RESET} "
+                f"{video['title'][:50]}... "
+                f"(Was: {video.get('status', 'Unknown')})"
+            )
+
             send_discord(
-                f"🔴 **Video Removed**\n"
+                f"🔴 **Video Removed**\n\n"
                 f"**Playlist:** {name}\n\n"
-                f"**Last Status:** {video.get('status', 'Unknown')}\n\n"
+                f"**Last Status:** "
+                f"{video.get('status', 'Unknown')}\n\n"
                 f"**Title:**\n{video['title']}\n\n"
                 f"**ID:**\n{video['id']}\n\n"
                 f"https://youtu.be/{video['id']}"
@@ -225,8 +269,9 @@ def scan_playlist(name, url):
 
     if changes == 0:
         print(f"  {Color.BLUE}✓ No changes detected.{Color.RESET}")
+
     print("-" * 50)
-    
+
     save_database(name, current)
 
 
