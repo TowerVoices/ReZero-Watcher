@@ -4,6 +4,10 @@ import yt_dlp
 import requests
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 def send_discord(message):
 
     webhook = os.getenv("DISCORD_WEBHOOK_URL")
