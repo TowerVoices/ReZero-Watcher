@@ -4,35 +4,66 @@ import requests
 import yt_dlp
 from dotenv import load_dotenv
 
-# تحميل متغيرات البيئة من ملف .env
+# تحميل متغيرات البيئة
 load_dotenv()
 
 WATCHLIST = "watchlist.json"
 DATABASE = "database"
 
+# ==========================================
+# 1. إعدادات الألوان لتجميل الشاشة (Console)
+# ==========================================
+class Color:
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    CYAN = '\033[96m'
+    BLUE = '\033[94m'
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+
+# ==========================================
+# 2. كتم تحذيرات وأخطاء yt_dlp المزعجة
+# ==========================================
+class SilentLogger(object):
+    def debug(self, msg):
+        pass
+    def warning(self, msg):
+        pass
+    def error(self, msg):
+        pass
+
+# الإعدادات العامة لـ yt_dlp لمنع أي نصوص غير مرغوب فيها
+YTDLP_OPTS = {
+    "quiet": True,
+    "no_warnings": True,
+    "skip_download": True,
+    "extract_flat": True,
+    "logger": SilentLogger()  # هنا نستخدم الكاتم
+}
+
+# ==========================================
+# الدوال الأساسية
+# ==========================================
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 def send_discord(message):
     webhook = os.getenv("DISCORD_WEBHOOK_URL")
-
     if not webhook:
-        print("Discord webhook not found.")
         return
 
     try:
-        requests.post(
-            webhook,
-            json={"content": message},
-            timeout=15
-        )
-    except Exception as e:
-        print(f"Failed to send Discord message: {e}")
+        requests.post(webhook, json={"content": message}, timeout=15)
+    except Exception:
+        pass # نتجاهل أخطاء الديسكورد كي لا تشوه الشاشة
 
 
 def load_watchlist():
     if not os.path.exists(WATCHLIST):
-        print(f"Error: {WATCHLIST} not found. Please create it.")
+        print(f"{Color.RED}✖ Error: {WATCHLIST} not found.{Color.RESET}")
         return {}
-    
     with open(WATCHLIST, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -40,10 +71,8 @@ def load_watchlist():
 def load_database(name):
     os.makedirs(DATABASE, exist_ok=True)
     path = os.path.join(DATABASE, f"{name}.json")
-
     if not os.path.exists(path):
         return []
-
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -51,45 +80,39 @@ def load_database(name):
 def save_database(name, data):
     os.makedirs(DATABASE, exist_ok=True)
     path = os.path.join(DATABASE, f"{name}.json")
-
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 def check_video_status(video_id):
+    # نستخدم إعدادات صامتة مخصصة لفحص فيديو واحد
+    single_opts = YTDLP_OPTS.copy()
+    single_opts["extract_flat"] = False 
+
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True}) as ydl:
+        with yt_dlp.YoutubeDL(single_opts) as ydl:
             ydl.extract_info(f"https://youtu.be/{video_id}", download=False)
         return "Public"
-
     except Exception as e:
         text = str(e)
-        if "Private video" in text:
+        if "Private video" in text or "private" in text.lower():
             return "Private"
-        elif "Video unavailable" in text:
+        elif "Video unavailable" in text or "unavailable" in text.lower():
             return "Unavailable"
-        elif "Members only" in text:
+        elif "Members only" in text or "members" in text.lower():
             return "Members"
         return "Unknown"
 
 
 def scan_playlist(name, url):
-    print(f"\nScanning Playlist: {name}")
+    print(f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} {Color.BOLD}{name}{Color.RESET} ... ", end="", flush=True)
     
-    # 1. جلب البيانات القديمة
     old = load_database(name)
     old_ids = {x["id"] for x in old}
 
-    # 2. جلب البيانات الحالية من اليوتيوب
-    opts = {
-        "quiet": True,
-        "extract_flat": True,
-        "skip_download": True
-    }
-    
     current = []
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        with yt_dlp.YoutubeDL(YTDLP_OPTS) as ydl:
             info = ydl.extract_info(url, download=False)
             
             if "entries" in info:
@@ -107,23 +130,21 @@ def scan_playlist(name, url):
                         "status": status
                     })
     except Exception as e:
-        print(f"Error fetching playlist {name}: {e}")
+        print(f"{Color.RED}Failed!{Color.RESET}")
         return
+
+    print(f"{Color.GREEN}Done! ({len(current)} videos){Color.RESET}")
 
     new_ids = {x["id"] for x in current}
     changes = 0
 
-    # 3. التحقق من الفيديوهات الجديدة
+    # 1. فيديوهات جديدة
     for video in current:
         if video["id"] not in old_ids:
             changes += 1
-            print(f"[NEW] {video['id']}")
-            print(video["title"])
-            print("Status :", video["status"])
-            print()
-
+            print(f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} {video['title'][:50]}... ({video['status']})")
             send_discord(
-                f"🟢 **New Video**\n\n"
+                f"🟢 **New Video**\n"
                 f"**Playlist:** {name}\n"
                 f"**Status:** {video['status']}\n\n"
                 f"**Title:**\n{video['title']}\n\n"
@@ -131,10 +152,9 @@ def scan_playlist(name, url):
                 f"https://youtu.be/{video['id']}"
             )
 
-    # 4. التحقق من تغير حالة الفيديو (مثل تحوله من عام إلى خاص)
+    # 2. تغير الحالة
     for video in current:
         old_video = next((x for x in old if x["id"] == video["id"]), None)
-        
         if old_video is None:
             continue
 
@@ -143,13 +163,9 @@ def scan_playlist(name, url):
 
         if old_status != new_status:
             changes += 1
-            print(f"[STATUS CHANGED] {video['id']}")
-            print(video["title"])
-            print(f"{old_status} -> {new_status}")
-            print()
-
+            print(f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} {video['title'][:50]}... [{old_status} ➔ {new_status}]")
             send_discord(
-                f"🟡 **Video Status Changed**\n\n"
+                f"🟡 **Video Status Changed**\n"
                 f"**Playlist:** {name}\n\n"
                 f"**Title:**\n{video['title']}\n\n"
                 f"**ID:**\n{video['id']}\n\n"
@@ -157,50 +173,46 @@ def scan_playlist(name, url):
                 f"https://youtu.be/{video['id']}"
             )
 
-    # 5. التحقق من الفيديوهات المحذوفة من القائمة
+    # 3. فيديوهات محذوفة
     for video in old:
         if video["id"] not in new_ids:
             changes += 1
-            print(f"[REMOVED] {video['id']}")
-            print(video["title"])
-            print("Status :", video.get("status", "Unknown"))
-            print()
-
+            print(f"  {Color.RED}[-] REMOVED:{Color.RESET} {video['title'][:50]}... (Was: {video.get('status', 'Unknown')})")
             send_discord(
-                f"🔴 **Video Removed**\n\n"
+                f"🔴 **Video Removed**\n"
                 f"**Playlist:** {name}\n\n"
                 f"**Last Status:** {video.get('status', 'Unknown')}\n\n"
                 f"**Title:**\n{video['title']}\n\n"
-                f"**ID:**\n{video['id']}"
+                f"**ID:**\n{video['id']}\n\n"
+                f"https://youtu.be/{video['id']}"
             )
 
     if changes == 0:
-        print("✓ No changes found.")
-
-    print(f"Total Videos : {len(current)}\n")
+        print(f"  {Color.BLUE}✓ No changes detected.{Color.RESET}")
+    print("-" * 50)
     
-    # حفظ البيانات الجديدة
     save_database(name, current)
 
 
 def run():
-    send_discord("✅ Discord Webhook works successfully.")
+    print(f"\n{Color.BOLD}Starting Playlist Inspection...{Color.RESET}\n")
+    send_discord("✅ Video Inspector Started Successfully.")
+    
     watchlist = load_watchlist()
     playlists = watchlist.get("youtube_playlists", [])
 
     if not playlists:
-        print("No playlists found in watchlist.json.")
+        print(f"{Color.YELLOW}⚠ No playlists found in watchlist.json.{Color.RESET}")
         return
 
     for playlist in playlists:
         playlist_id = playlist.get("playlist_id")
         if not playlist_id:
             continue
-            
         url = f"https://www.youtube.com/playlist?list={playlist_id}"
         scan_playlist(playlist["name"], url)
 
-    print("Finished scanning all playlists.\n")
+    print(f"\n{Color.GREEN}{Color.BOLD}✔ All playlists scanned successfully!{Color.RESET}\n")
 
 
 def export_ids():
@@ -210,20 +222,16 @@ def export_ids():
     os.makedirs("output", exist_ok=True)
     filename = "output/all_ids.txt"
 
+    print(f"\n{Color.CYAN}Exporting IDs to {filename}...{Color.RESET}\n")
+
     with open(filename, "w", encoding="utf-8") as out:
         for playlist in playlists:
-            print(f"\nExporting : {playlist['name']}")
+            print(f"{Color.YELLOW}Exporting:{Color.RESET} {playlist['name']} ", end="", flush=True)
             
             playlist_id = playlist["playlist_id"]
             url = f"https://www.youtube.com/playlist?list={playlist_id}"
 
-            opts = {
-                "quiet": True,
-                "extract_flat": True,
-                "skip_download": True
-            }
-
-            with yt_dlp.YoutubeDL(opts) as ydl:
+            with yt_dlp.YoutubeDL(YTDLP_OPTS) as ydl:
                 info = ydl.extract_info(url, download=False)
 
             out.write(f"{playlist['name']}\n")
@@ -237,46 +245,50 @@ def export_ids():
                         
                     status = check_video_status(video_id)
 
-                    if status == "Public":
-                        icon = "🟢"
-                    elif status == "Private":
-                        icon = "🔒"
-                    elif status == "Unavailable":
-                        icon = "⚫"
-                    elif status == "Members":
-                        icon = "👑"
-                    else:
-                        icon = "❓"
+                    if status == "Public": icon = "🟢"
+                    elif status == "Private": icon = "🔒"
+                    elif status == "Unavailable": icon = "⚫"
+                    elif status == "Members": icon = "👑"
+                    else: icon = "❓"
 
                     line = f"{video_id:<15} {icon} {status}"
-                    print(line)
                     out.write(line + "\n")
-
+            
             out.write("\n")
+            print(f"{Color.GREEN}✔ Done!{Color.RESET}")
 
-    print(f"\nSaved : {filename}\n")
+    print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
 
 
+# ==========================================
+# واجهة المستخدم (القائمة الرئيسية)
+# ==========================================
 if __name__ == "__main__":
     if os.getenv("GITHUB_ACTIONS") == "true":
         run()
     else:
+        clear_screen()
         while True:
-            print("=" * 40)
-            print("Video Inspector")
-            print("=" * 40)
-            print("1. Watch Playlists")
-            print("2. Export All IDs")
-            print("3. Exit")
-            print()
+            print(f"{Color.CYAN}{Color.BOLD}" + "=" * 45)
+            print("         🎬 YOUTUBE VIDEO INSPECTOR")
+            print("=" * 45 + f"{Color.RESET}")
+            print(f" {Color.GREEN}1.{Color.RESET} Scan Playlists & Check Changes")
+            print(f" {Color.YELLOW}2.{Color.RESET} Export All IDs to Text File")
+            print(f" {Color.RED}3.{Color.RESET} Exit")
+            print(f"{Color.CYAN}" + "-" * 45 + f"{Color.RESET}")
 
-            choice = input("Choice : ").strip()
+            choice = input(f"{Color.BOLD}Enter your choice (1-3): {Color.RESET}").strip()
 
             if choice == "1":
                 run()
+                input(f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}")
+                clear_screen()
             elif choice == "2":
                 export_ids()
+                input(f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}")
+                clear_screen()
             elif choice == "3":
+                print(f"\n{Color.GREEN}Exiting... Goodbye! 👋{Color.RESET}")
                 break
             else:
-                print("Invalid choice. Try again.\n")
+                print(f"{Color.RED}\n✖ Invalid choice. Please try again.\n{Color.RESET}")
