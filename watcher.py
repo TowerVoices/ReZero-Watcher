@@ -201,6 +201,8 @@ def scan_playlist(name, url):
 
 def run():
 
+    
+    send_discord("✅ Discord Webhook يعمل بنجاح")
     watchlist = load_watchlist()
 
     playlists = watchlist.get("youtube_playlists", [])
