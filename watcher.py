@@ -232,22 +232,28 @@ def export_ids():
     print("Saved :", filename)
     print()
 
+import os
+
 if __name__ == "__main__":
 
-    print("=" * 40)
-    print("Video Inspector")
-    print("=" * 40)
-    print("1. Watch Playlists")
-    print("2. Export All IDs")
-    print()
-
-    choice = input("Choice : ").strip()
-
-    if choice == "1":
+    if os.getenv("GITHUB_ACTIONS") == "true":
         run()
 
-    elif choice == "2":
-        export_ids()
-
     else:
-        print("Invalid choice.")
+        print("=" * 40)
+        print("Video Inspector")
+        print("=" * 40)
+        print("1. Watch Playlists")
+        print("2. Export All IDs")
+        print()
+
+        choice = input("Choice : ").strip()
+
+        if choice == "1":
+            run()
+
+        elif choice == "2":
+            export_ids()
+
+        else:
+            print("Invalid choice.")
