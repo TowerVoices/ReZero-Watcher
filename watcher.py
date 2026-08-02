@@ -113,11 +113,12 @@ def check_video_status(video_id):
         text_lower = text.lower()
 
         # ==========================================
-        # 1. انتهاء الكوكيز أو طلب تسجيل الدخول
+        # 1. انتهاء الكوكيز أو منع يوتيوب
         # ==========================================
         if (
             "sign in to confirm you're not a bot" in text_lower
-            or "cookies" in text_lower
+            or "cookie file is not in netscape format" in text_lower
+            or "cookies are no longer valid" in text_lower
         ):
             if not cookies_alert_sent:
                 send_discord(
@@ -149,7 +150,7 @@ def check_video_status(video_id):
             return "Members"
 
         # ==========================================
-        # 3. أخطاء مؤقتة (لا نغيّر الحالة بسببها)
+        # 3. أخطاء مؤقتة
         # ==========================================
         if (
             "429" in text_lower
@@ -165,11 +166,14 @@ def check_video_status(video_id):
             return "Network Error"
 
         # ==========================================
-        # 4. أي خطأ آخر
+        # 4. أي خطأ آخر (للتشخيص)
         # ==========================================
-        # print(f"[DEBUG] {video_id}: {text}")
+        print("=" * 80)
+        print(f"[DEBUG] Video ID: {video_id}")
+        print(text)
+        print("=" * 80)
+
         return "Unknown Error"
-     
 def scan_playlist(name, url):
     print(
         f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} "
