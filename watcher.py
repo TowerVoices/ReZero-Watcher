@@ -51,14 +51,23 @@ def clear_screen():
 
 def send_discord(message):
     webhook = os.getenv("DISCORD_WEBHOOK_URL")
+
     if not webhook:
         return
 
     try:
-        requests.post(webhook, json={"content": message}, timeout=15)
-    except Exception:
-        pass # نتجاهل أخطاء الديسكورد كي لا تشوه الشاشة
+        r = requests.post(
+            webhook,
+            json={"content": message},
+            timeout=15
+        )
 
+        if r.status_code >= 400:
+            print("Discord Error:", r.status_code)
+            print(r.text)
+
+    except Exception as e:
+        print("Discord Exception:", e)
 
 def load_watchlist():
     if not os.path.exists(WATCHLIST):
@@ -95,6 +104,7 @@ def check_video_status(video_id):
         return "Public"
     except Exception as e:
         text = str(e)
+        print(text)
         if "Private video" in text or "private" in text.lower():
             return "Private"
         elif "Video unavailable" in text or "unavailable" in text.lower():
