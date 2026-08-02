@@ -1,7 +1,25 @@
 import json
 import os
 import yt_dlp
+import requests
+import os
 
+def send_discord(message):
+
+    webhook = os.getenv("DISCORD_WEBHOOK_URL")
+
+    if not webhook:
+        print("Discord webhook not found.")
+        return
+
+    requests.post(
+        webhook,
+        json={
+            "content": message
+        },
+        timeout=15
+    )
+    
 WATCHLIST = "watchlist.json"
 DATABASE = "database"
 
@@ -127,6 +145,24 @@ def scan_playlist(name, url):
             print("Status :", video["status"])
             print()
 
+            send_discord(
+                f"""🟢 **New Video**
+
+            **Playlist:** {name}
+            **Status:** {video["status"]}
+
+            **Title:**
+            {video["title"]}
+
+            **ID:**
+            {video["id"]}
+
+            https://youtu.be/{video["id"]}"""
+            )
+            
+            
+            
+
     for video in old:
 
         if video["id"] not in new_ids:
@@ -137,6 +173,22 @@ def scan_playlist(name, url):
             print(video["title"])
             print("Status :", video.get("status", "Unknown"))
             print()
+
+            send_discord(
+                f"""🔴 **Video Removed**
+
+            **Playlist:** {name}
+            **Last Status:** {video.get("status", "Unknown")}
+
+            **Title:**
+            {video["title"]}
+
+            **ID:**
+            {video["id"]}"""
+            )
+            
+            
+            
 
     if changes == 0:
         print("✓ No changes found.\n")
