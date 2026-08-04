@@ -303,10 +303,13 @@ def export_ids():
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
 
-
 if __name__ == "__main__":
-    if os.getenv("GITHUB_ACTIONS") == "true":
+    import sys
+
+    # GitHub Actions أو التشغيل التلقائي على VPS
+    if os.getenv("GITHUB_ACTIONS") == "true" or "--auto" in sys.argv:
         run()
+
     else:
         clear_screen()
         while True:
@@ -324,12 +327,15 @@ if __name__ == "__main__":
                 run()
                 input(f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}")
                 clear_screen()
+
             elif choice == "2":
                 export_ids()
                 input(f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}")
                 clear_screen()
+
             elif choice == "3":
                 print(f"\n{Color.GREEN}Exiting... Goodbye! 👋{Color.RESET}")
                 break
+
             else:
                 print(f"{Color.RED}\n✖ Invalid choice. Please try again.\n{Color.RESET}")
