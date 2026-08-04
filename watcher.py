@@ -84,7 +84,8 @@ def load_database(name):
     if not os.path.exists(path):
         return []
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+        return [x for x in data if isinstance(x, dict) and "id" in x]
 
 def save_database(name, data):
     os.makedirs(DATABASE, exist_ok=True)
@@ -151,25 +152,23 @@ def scan_playlist(name, url):
 
             print(f" ⏳ Checking ({index+1}/{total_videos}): {video_id} ... ", end="", flush=True)
 
-            # ==================================================
-            # المنطق الجديد: التحقق من حالة الفيديو في قاعدة البيانات
-            # ==================================================
             old_video_data = next((x for x in old if x["id"] == video_id), None)
 
-            # إذا كان الفيديو موجوداً وحالته السابقة Public، نتخطى الفحص تماماً
+            # --- الحفاظ على منطقك الخاص بالتخطي الذكي للفيديوهات العامة ---
             if old_video_data and old_video_data.get("status") == "Public":
                 status = "Public"
+                # إذا وجدنا عنواناً أفضل مع الوقت، نحدثه
+                if old_video_data.get("title") and old_video_data.get("title") != "Unknown Title":
+                    title = old_video_data.get("title")
                 print(f"[{Color.GREEN}{status}{Color.RESET}] (Skipped - Already Public)")
             else:
-                # فيديو جديد أو حالته السابقة ليست Public، نقوم بطلب فحصه
+                # فحص الفيديوهات الجديدة، أو الفيديوهات التي كانت (Private / Unavailable) سابقاً
                 status = check_video_status(video_id)
 
-                # التوقف فوراً إذا انتهت الكوكيز
                 if status == "Cookies Expired":
                     print(f"{Color.RED}Bot Blocked! Scan aborted.{Color.RESET}")
                     return
 
-                # منع الإشعارات الكاذبة لأخطاء الشبكة والسكربت
                 if status in ["Rate Limited", "Network Error", "Unknown Error"]:
                     if old_video_data:
                         status = old_video_data.get("status", status)
@@ -178,11 +177,9 @@ def scan_playlist(name, url):
 
                 print(f"[{status}]")
 
-                # تأخير عشوائي فقط إذا قمنا بإرسال طلب فعلي ليوتيوب
                 if index < total_videos - 1:
                     sleep_time = random.uniform(3, 6)
                     time.sleep(sleep_time)
-            # ==================================================
 
             current.append({
                 "id": video_id,
@@ -201,14 +198,15 @@ def scan_playlist(name, url):
     new_ids = {x["id"] for x in current}
     changes = 0
 
-    # فيديوهات جديدة
+    # 1. فيديوهات جديدة
     for video in current:
         if video["id"] not in old_ids:
             changes += 1
-            print(f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} {video['title'][:50]}... ({video['status']})")
-            send_discord(f"🟢 **New Video**\n\n**Playlist:** {name}\n**Status:** {video['status']}\n\n**Title:**\n{video['title']}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
+            safe_title = str(video.get('title') or 'Unknown Title')
+            print(f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} {safe_title[:50]}... ({video['status']})")
+            send_discord(f"🟢 **New Video**\n\n**Playlist:** {name}\n**Status:** {video['status']}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
 
-    # تغير الحالة
+    # 2. تغير الحالة (مثلاً من Private إلى Public أو العكس)
     for video in current:
         old_video = next((x for x in old if x["id"] == video["id"]), None)
         if not old_video: continue
@@ -218,15 +216,19 @@ def scan_playlist(name, url):
 
         if old_status != new_status:
             changes += 1
-            print(f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} {video['title'][:50]}... [{old_status} ➜ {new_status}]")
-            send_discord(f"🟡 **Video Status Changed**\n\n**Playlist:** {name}\n\n**Title:**\n{video['title']}\n\n**ID:**\n{video['id']}\n\n**Status:**\n{old_status} ➜ {new_status}\n\nhttps://youtu.be/{video['id']}")
+            safe_title = str(video.get('title') or 'Unknown Title')
+            print(f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} {safe_title[:50]}... [{old_status} ➜ {new_status}]")
+            send_discord(f"🟡 **Video Status Changed**\n\n**Playlist:** {name}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\n**Status:**\n{old_status} ➜ {new_status}\n\nhttps://youtu.be/{video['id']}")
 
-    # فيديوهات محذوفة (الفيديو اختفى من القائمة)
+    # 3. فيديوهات محذوفة / مخفية تماماً من القائمة
     for video in old:
         if video["id"] not in new_ids:
             changes += 1
-            print(f"  {Color.RED}[-] REMOVED:{Color.RESET} {video['title'][:50]}... (Was: {video.get('status', 'Unknown')})")
-            send_discord(f"🔴 **Video Removed**\n\n**Playlist:** {name}\n\n**Last Status:** {video.get('status', 'Unknown')}\n\n**Title:**\n{video['title']}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
+            safe_title = str(video.get('title') or 'Unknown Title')
+            old_status = video.get('status', 'Unknown')
+            
+            print(f"  {Color.RED}[-] REMOVED:{Color.RESET} {safe_title[:50]}... (Was: {old_status})")
+            send_discord(f"🔴 **Video Removed**\n\n**Playlist:** {name}\n\n**Last Status:** {old_status}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
 
     if changes == 0:
         print(f"  {Color.BLUE}✓ No changes detected.{Color.RESET}")
@@ -269,7 +271,6 @@ def export_ids():
             out.write(f"{playlist['name']}\n")
             out.write("=" * 60 + "\n")
 
-            # قراءة البيانات المحفوظة محلياً لعدم إرسال طلبات جديدة وتجنب الحظر
             local_data = load_database(playlist['name'])
             
             if local_data:
