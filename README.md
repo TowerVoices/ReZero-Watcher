@@ -100,6 +100,8 @@ The project also supports automatic cloud monitoring through GitHub Actions.
 **Required repository secrets:**
 
 ---
+* `DISCORD_WEBHOOK_URL`
+* `YOUTUBE_COOKIES`
 
 ## 👨‍💻 Author
 
@@ -110,7 +112,5 @@ Developer of Re:Zero automation tools and monitoring utilities.
 - **X (Twitter):** https://x.com/TowerVoices
 
 Thank you for checking out this project!
-* `DISCORD_WEBHOOK_URL`
-* `YOUTUBE_COOKIES`
 
 No additional configuration is required after adding the secrets.
