@@ -98,6 +98,18 @@ Temporary images used for Discord uploads are stored in:
 The project also supports automatic cloud monitoring through GitHub Actions.
 
 **Required repository secrets:**
+
+---
+
+## 👨‍💻 Author
+
+**TowerVoices**
+
+Developer of Re:Zero automation tools and monitoring utilities.
+
+- **X (Twitter):** https://x.com/TowerVoices
+
+Thank you for checking out this project!
 * `DISCORD_WEBHOOK_URL`
 * `YOUTUBE_COOKIES`
 
