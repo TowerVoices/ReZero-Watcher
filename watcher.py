@@ -3,6 +3,7 @@ import os
 import requests
 import yt_dlp
 import time
+import sys
 import random
 from dotenv import load_dotenv
 
@@ -302,9 +303,7 @@ def export_ids():
             print(f"{Color.GREEN}✔ Done!{Color.RESET}")
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
-
 if __name__ == "__main__":
-    import sys
 
     # GitHub Actions أو التشغيل التلقائي على VPS
     if os.getenv("GITHUB_ACTIONS") == "true" or "--auto" in sys.argv:

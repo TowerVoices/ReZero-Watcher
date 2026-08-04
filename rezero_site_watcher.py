@@ -1,6 +1,7 @@
 import json
 import os
 import requests
+import sys
 from dotenv import load_dotenv
 
 from extractors.story import parse_story
@@ -591,13 +592,14 @@ def run():
 # ==========================================
 # 9. Main Menu
 # ==========================================
+
 if __name__ == "__main__":
 
     # ---------------------------------
-    # GitHub Actions
+    # GitHub Actions + VPS Auto Mode
     # ---------------------------------
 
-    if os.getenv("GITHUB_ACTIONS") == "true":
+    if os.getenv("GITHUB_ACTIONS") == "true" or "--auto" in sys.argv:
 
         run()
 
