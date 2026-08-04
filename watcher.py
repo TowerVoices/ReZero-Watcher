@@ -60,16 +60,27 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def send_discord(message):
-    webhook = os.getenv("DISCORD_WEBHOOK_URL")
-    if not webhook:
+    # جلب روابط الويب هوك من ملف .env للسيرفرين
+    webhooks = [
+        os.getenv("DISCORD_WEBHOOK_URL"),
+        os.getenv("DISCORD_WEBHOOK_URL_2")
+    ]
+    
+    # فلترة القائمة للتأكد من وجود روابط صحيحة
+    valid_webhooks = [w for w in webhooks if w and w.strip()]
+
+    if not valid_webhooks:
         return
-    try:
-        r = requests.post(webhook, json={"content": message}, timeout=15)
-        if r.status_code >= 400:
-            print("Discord Error:", r.status_code)
-            print(r.text)
-    except Exception as e:
-        print("Discord Exception:", e)
+        
+    # إرسال الرسالة إلى كل الروابط المتاحة
+    for webhook in valid_webhooks:
+        try:
+            r = requests.post(webhook, json={"content": message}, timeout=15)
+            if r.status_code >= 400:
+                print(f"Discord Error ({webhook[:30]}...):", r.status_code)
+                print(r.text)
+        except Exception as e:
+            print("Discord Exception:", e)
 
 def load_watchlist():
     if not os.path.exists(WATCHLIST):
@@ -110,7 +121,7 @@ def check_video_status(video_id):
         if "sign in to confirm you're not a bot" in text or "cookie file is not in netscape format" in text or "cookies are no longer valid" in text:
             if not cookies_alert_sent:
                 send_discord(
-                    "🚨 **YouTube Session Expired / Bot Detected**\n\n"
+                    "@everyone 🚨 **YouTube Session Expired / Bot Detected**\n\n"
                     "The current session is blocked by CAPTCHA or expired.\n"
                     "Please update your YOUTUBE_COOKIES."
                 )
@@ -154,15 +165,13 @@ def scan_playlist(name, url):
 
             old_video_data = next((x for x in old if x["id"] == video_id), None)
 
-            # --- الحفاظ على منطقك الخاص بالتخطي الذكي للفيديوهات العامة ---
+            # --- التخطي الذكي للفيديوهات العامة ---
             if old_video_data and old_video_data.get("status") == "Public":
                 status = "Public"
-                # إذا وجدنا عنواناً أفضل مع الوقت، نحدثه
                 if old_video_data.get("title") and old_video_data.get("title") != "Unknown Title":
                     title = old_video_data.get("title")
                 print(f"[{Color.GREEN}{status}{Color.RESET}] (Skipped - Already Public)")
             else:
-                # فحص الفيديوهات الجديدة، أو الفيديوهات التي كانت (Private / Unavailable) سابقاً
                 status = check_video_status(video_id)
 
                 if status == "Cookies Expired":
@@ -204,7 +213,7 @@ def scan_playlist(name, url):
             changes += 1
             safe_title = str(video.get('title') or 'Unknown Title')
             print(f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} {safe_title[:50]}... ({video['status']})")
-            send_discord(f"🟢 **New Video**\n\n**Playlist:** {name}\n**Status:** {video['status']}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
+            send_discord(f"@everyone 🟢 **New Video**\n\n**Playlist:** {name}\n**Status:** {video['status']}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
 
     # 2. تغير الحالة (مثلاً من Private إلى Public أو العكس)
     for video in current:
@@ -218,7 +227,7 @@ def scan_playlist(name, url):
             changes += 1
             safe_title = str(video.get('title') or 'Unknown Title')
             print(f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} {safe_title[:50]}... [{old_status} ➜ {new_status}]")
-            send_discord(f"🟡 **Video Status Changed**\n\n**Playlist:** {name}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\n**Status:**\n{old_status} ➜ {new_status}\n\nhttps://youtu.be/{video['id']}")
+            send_discord(f"@everyone 🟡 **Video Status Changed**\n\n**Playlist:** {name}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\n**Status:**\n{old_status} ➜ {new_status}\n\nhttps://youtu.be/{video['id']}")
 
     # 3. فيديوهات محذوفة / مخفية تماماً من القائمة
     for video in old:
@@ -228,7 +237,7 @@ def scan_playlist(name, url):
             old_status = video.get('status', 'Unknown')
             
             print(f"  {Color.RED}[-] REMOVED:{Color.RESET} {safe_title[:50]}... (Was: {old_status})")
-            send_discord(f"🔴 **Video Removed**\n\n**Playlist:** {name}\n\n**Last Status:** {old_status}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
+            send_discord(f"@everyone 🔴 **Video Removed**\n\n**Playlist:** {name}\n\n**Last Status:** {old_status}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
 
     if changes == 0:
         print(f"  {Color.BLUE}✓ No changes detected.{Color.RESET}")
@@ -238,7 +247,7 @@ def scan_playlist(name, url):
 
 def run():
     print(f"\n{Color.BOLD}Starting Playlist Inspection...{Color.RESET}\n")
-    send_discord("✅ Video Inspector Started Successfully.")
+    # تم إزالة إشعار البدء المزعج ليعمل بصمت تام
     
     watchlist = load_watchlist()
     playlists = watchlist.get("youtube_playlists", [])
