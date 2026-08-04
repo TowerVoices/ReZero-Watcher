@@ -591,48 +591,62 @@ def run():
 # ==========================================
 # 9. Main Menu
 # ==========================================
-
 if __name__ == "__main__":
 
-    clear_screen()
+    # ---------------------------------
+    # GitHub Actions
+    # ---------------------------------
 
-    while True:
+    if os.getenv("GITHUB_ACTIONS") == "true":
 
-        print(f"{Color.CYAN}{Color.BOLD}")
-        print("=" * 45)
-        print("        RE:ZERO SITE WATCHER")
-        print("=" * 45)
-        print(Color.RESET)
+        run()
 
-        print(f"{Color.GREEN}1.{Color.RESET} Scan Story")
-        print(f"{Color.YELLOW}2.{Color.RESET} Scan News")
-        print(f"{Color.BLUE}3.{Color.RESET} Scan Everything")
-        print(f"{Color.RED}4.{Color.RESET} Exit")
+    else:
 
-        print()
-
-        choice = input(
-            "Enter your choice: "
-        ).strip()
-
-        if choice == "1":
-            check_story()
-
-        elif choice == "2":
-            check_news()
-
-        elif choice == "3":
-            run()
-
-        elif choice == "4":
-            break
-
-        else:
-            print(
-                f"{Color.RED}"
-                "Invalid choice."
-                f"{Color.RESET}"
-            )
-
-        input("\nPress Enter...")
         clear_screen()
+
+        while True:
+
+            print(f"{Color.CYAN}{Color.BOLD}")
+            print("=" * 45)
+            print("        RE:ZERO SITE WATCHER")
+            print("=" * 45)
+            print(Color.RESET)
+
+            print(f"{Color.GREEN}1.{Color.RESET} Scan Story")
+            print(f"{Color.YELLOW}2.{Color.RESET} Scan News")
+            print(f"{Color.BLUE}3.{Color.RESET} Scan Everything")
+            print(f"{Color.RED}4.{Color.RESET} Exit")
+
+            print()
+
+            choice = input(
+                "Enter your choice: "
+            ).strip()
+
+            if choice == "1":
+
+                check_story()
+
+            elif choice == "2":
+
+                check_news()
+
+            elif choice == "3":
+
+                run()
+
+            elif choice == "4":
+
+                break
+
+            else:
+
+                print(
+                    f"{Color.RED}"
+                    "Invalid choice."
+                    f"{Color.RESET}"
+                )
+
+            input("\nPress Enter...")
+            clear_screen()
