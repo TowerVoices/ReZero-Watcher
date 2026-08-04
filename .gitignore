@@ -8,6 +8,9 @@ __pycache__/
 # Environment variables
 .env
 
+# Cookies
+cookies.txt
+
 # Downloads
 downloads/
 
