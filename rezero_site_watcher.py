@@ -2,6 +2,7 @@ import json
 import os
 import requests
 import sys
+import time
 from dotenv import load_dotenv
 
 from extractors.story import parse_story
@@ -592,16 +593,37 @@ def run():
 # ==========================================
 # 9. Main Menu
 # ==========================================
-
 if __name__ == "__main__":
 
     # ---------------------------------
-    # GitHub Actions + VPS Auto Mode
+    # GitHub Actions
     # ---------------------------------
 
-    if os.getenv("GITHUB_ACTIONS") == "true" or "--auto" in sys.argv:
+    if os.getenv("GITHUB_ACTIONS") == "true":
 
         run()
+
+    # ---------------------------------
+    # VPS Auto Mode
+    # ---------------------------------
+
+    elif "--auto" in sys.argv:
+
+        while True:
+
+            run()
+
+            print(
+                f"\n{Color.CYAN}"
+                "Waiting 5 minutes until next scan..."
+                f"{Color.RESET}\n"
+            )
+
+            time.sleep(300)
+
+    # ---------------------------------
+    # Interactive Mode
+    # ---------------------------------
 
     else:
 

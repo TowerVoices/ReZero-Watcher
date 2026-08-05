@@ -305,12 +305,21 @@ def export_ids():
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
 if __name__ == "__main__":
 
-    # GitHub Actions أو التشغيل التلقائي على VPS
-    if os.getenv("GITHUB_ACTIONS") == "true" or "--auto" in sys.argv:
+    # GitHub Actions
+    if os.getenv("GITHUB_ACTIONS") == "true":
         run()
 
+    # VPS Auto Mode
+    elif "--auto" in sys.argv:
+        while True:
+            run()
+            print(f"\n{Color.CYAN}Waiting 10 minutes until next scan...{Color.RESET}\n")
+            time.sleep(600)
+
+    # Interactive Mode
     else:
         clear_screen()
+
         while True:
             print(f"{Color.CYAN}{Color.BOLD}" + "=" * 45)
             print("         🎬 YOUTUBE VIDEO INSPECTOR")
@@ -320,16 +329,22 @@ if __name__ == "__main__":
             print(f" {Color.RED}3.{Color.RESET} Exit")
             print(f"{Color.CYAN}" + "-" * 45 + f"{Color.RESET}")
 
-            choice = input(f"{Color.BOLD}Enter your choice (1-3): {Color.RESET}").strip()
+            choice = input(
+                f"{Color.BOLD}Enter your choice (1-3): {Color.RESET}"
+            ).strip()
 
             if choice == "1":
                 run()
-                input(f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}")
+                input(
+                    f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}"
+                )
                 clear_screen()
 
             elif choice == "2":
                 export_ids()
-                input(f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}")
+                input(
+                    f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}"
+                )
                 clear_screen()
 
             elif choice == "3":
