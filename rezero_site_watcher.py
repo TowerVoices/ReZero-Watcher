@@ -602,46 +602,47 @@ if __name__ == "__main__":
     if os.getenv("GITHUB_ACTIONS") == "true":
 
         run()
-# ---------------------------------
-# VPS Auto Mode
-# ---------------------------------
 
-elif "--auto" in sys.argv:
+    # ---------------------------------
+    # VPS Auto Mode
+    # ---------------------------------
 
-    while True:
+    elif "--auto" in sys.argv:
 
-        run()
+        while True:
 
-        now = datetime.now()
+            run()
 
-        # أقرب مضاعف لـ 5 دقائق
-        next_minute = ((now.minute // 5) + 1) * 5
+            now = datetime.now()
 
-        if next_minute == 60:
+            # أقرب مضاعف لـ 5 دقائق
+            next_minute = ((now.minute // 5) + 1) * 5
 
-            target = (now + timedelta(hours=1)).replace(
-                minute=0,
-                second=0,
-                microsecond=0
+            if next_minute == 60:
+
+                target = (now + timedelta(hours=1)).replace(
+                    minute=0,
+                    second=0,
+                    microsecond=0
+                )
+
+            else:
+
+                target = now.replace(
+                    minute=next_minute,
+                    second=0,
+                    microsecond=0
+                )
+
+            wait = (target - datetime.now()).total_seconds()
+
+            print(
+                f"\n{Color.CYAN}"
+                f"Waiting until {target.strftime('%H:%M:%S')}..."
+                f"{Color.RESET}\n"
             )
 
-        else:
-
-            target = now.replace(
-                minute=next_minute,
-                second=0,
-                microsecond=0
-            )
-
-        wait = (target - datetime.now()).total_seconds()
-
-        print(
-            f"\n{Color.CYAN}"
-            f"Waiting until {target.strftime('%H:%M:%S')}..."
-            f"{Color.RESET}\n"
-        )
-
-        time.sleep(max(wait, 0))
+            time.sleep(max(wait, 0))
 
     # ---------------------------------
     # Interactive Mode

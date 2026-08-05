@@ -304,48 +304,55 @@ def export_ids():
             print(f"{Color.GREEN}✔ Done!{Color.RESET}")
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
+
 if __name__ == "__main__":
 
     # GitHub Actions
     if os.getenv("GITHUB_ACTIONS") == "true":
         run()
-# VPS Auto Mode
-elif "--auto" in sys.argv:
-    while True:
-        run()
 
-        now = datetime.now()
+    # VPS Auto Mode
+    elif "--auto" in sys.argv:
 
-        # أقرب مضاعف لـ 5 دقائق
-        next_minute = ((now.minute // 5) + 1) * 5
+        while True:
 
-        if next_minute == 60:
-            target = (now + timedelta(hours=1)).replace(
-                minute=0,
-                second=0,
-                microsecond=0
+            run()
+
+            now = datetime.now()
+
+            # أقرب مضاعف لـ 5 دقائق
+            next_minute = ((now.minute // 5) + 1) * 5
+
+            if next_minute == 60:
+                target = (now + timedelta(hours=1)).replace(
+                    minute=0,
+                    second=0,
+                    microsecond=0
+                )
+            else:
+                target = now.replace(
+                    minute=next_minute,
+                    second=0,
+                    microsecond=0
+                )
+
+            wait = (target - datetime.now()).total_seconds()
+
+            print(
+                f"\n{Color.CYAN}"
+                f"Waiting until {target.strftime('%H:%M:%S')}..."
+                f"{Color.RESET}\n"
             )
-        else:
-            target = now.replace(
-                minute=next_minute,
-                second=0,
-                microsecond=0
-            )
 
-        wait = (target - datetime.now()).total_seconds()
+            time.sleep(max(wait, 0))
 
-        print(
-            f"\n{Color.CYAN}"
-            f"Waiting until {target.strftime('%H:%M:%S')}..."
-            f"{Color.RESET}\n"
-        )
-
-        time.sleep(max(wait, 0))
     # Interactive Mode
     else:
+
         clear_screen()
 
         while True:
+
             print(f"{Color.CYAN}{Color.BOLD}" + "=" * 45)
             print("         🎬 YOUTUBE VIDEO INSPECTOR")
             print("=" * 45 + f"{Color.RESET}")
