@@ -5,8 +5,11 @@ import yt_dlp
 import time
 import sys
 import random
+import threading
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+
+database_lock = threading.Lock()
 
 # تحميل متغيرات البيئة
 load_dotenv()
@@ -83,58 +86,143 @@ def send_discord(message):
                 print(r.text)
         except Exception as e:
             print("Discord Exception:", e)
-
 def load_watchlist():
+
     if not os.path.exists(WATCHLIST):
-        print(f"{Color.RED}✖ Error: {WATCHLIST} not found.{Color.RESET}")
+
+        print(
+            f"{Color.RED}"
+            f"✖ Error: {WATCHLIST} not found."
+            f"{Color.RESET}"
+        )
+
         return {}
+
     with open(WATCHLIST, "r", encoding="utf-8") as f:
+
         return json.load(f)
 
+
 def load_database(name):
+
     os.makedirs(DATABASE, exist_ok=True)
-    path = os.path.join(DATABASE, f"{name}.json")
+
+    path = os.path.join(
+        DATABASE,
+        f"{name}.json"
+    )
+
     if not os.path.exists(path):
+
         return []
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        return [x for x in data if isinstance(x, dict) and "id" in x]
+
+    with database_lock:
+
+        with open(path, "r", encoding="utf-8") as f:
+
+            data = json.load(f)
+
+            return [
+                x for x in data
+                if isinstance(x, dict)
+                and "id" in x
+            ]
+
 
 def save_database(name, data):
+
     os.makedirs(DATABASE, exist_ok=True)
-    path = os.path.join(DATABASE, f"{name}.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+
+    path = os.path.join(
+        DATABASE,
+        f"{name}.json"
+    )
+
+    with database_lock:
+
+        with open(path, "w", encoding="utf-8") as f:
+
+            json.dump(
+                data,
+                f,
+                indent=4,
+                ensure_ascii=False
+            )
+
 
 def check_video_status(video_id):
+
     global cookies_alert_sent
 
     single_opts = YTDLP_OPTS.copy()
+
     single_opts["extract_flat"] = False
 
     try:
+
         with yt_dlp.YoutubeDL(single_opts) as ydl:
-            ydl.extract_info(f"https://youtu.be/{video_id}", download=False)
+
+            ydl.extract_info(
+                f"https://youtu.be/{video_id}",
+                download=False
+            )
+
         return "Public"
 
     except Exception as e:
+
         text = str(e).lower()
 
-        if "sign in to confirm you're not a bot" in text or "cookie file is not in netscape format" in text or "cookies are no longer valid" in text:
+        if (
+            "sign in to confirm you're not a bot" in text
+            or "cookie file is not in netscape format" in text
+            or "cookies are no longer valid" in text
+        ):
+
             if not cookies_alert_sent:
+
                 send_discord(
                     "@everyone 🚨 **YouTube Session Expired / Bot Detected**\n\n"
                     "The current session is blocked by CAPTCHA or expired.\n"
                     "Please update your YOUTUBE_COOKIES."
                 )
+
                 cookies_alert_sent = True
+
             return "Cookies Expired"
 
-        if "private" in text: return "Private"
-        elif "unavailable" in text or "copyright" in text or "country" in text or "age-restricted" in text or "login required" in text: return "Unavailable"
-        elif "members" in text: return "Members"
-        elif "429" in text or "too many requests" in text: return "Rate Limited"
-        elif "network" in text or "timeout" in text or "urlopen error" in text: return "Network Error"
+        if "private" in text:
+
+            return "Private"
+
+        elif (
+            "unavailable" in text
+            or "copyright" in text
+            or "country" in text
+            or "age-restricted" in text
+            or "login required" in text
+        ):
+
+            return "Unavailable"
+
+        elif "members" in text:
+
+            return "Members"
+
+        elif (
+            "429" in text
+            or "too many requests" in text
+        ):
+
+            return "Rate Limited"
+
+        elif (
+            "network" in text
+            or "timeout" in text
+            or "urlopen error" in text
+        ):
+
+            return "Network Error"
 
         return "Unknown Error"
 
@@ -454,7 +542,35 @@ def export_ids():
             print(f"{Color.GREEN}✔ Done!{Color.RESET}")
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
-    
+
+
+def full_scan_scheduler():
+
+    last_full_minute = -1
+
+    while True:
+
+        now = datetime.now()
+
+        if (
+            now.minute % 5 == 0
+            and now.second < 30
+            and now.minute != last_full_minute
+        ):
+
+            print(
+                f"\n{Color.YELLOW}"
+                "🔍 Running Full Scan (Scheduled)..."
+                f"{Color.RESET}\n"
+            )
+
+            run_full()
+
+            last_full_minute = now.minute
+
+        time.sleep(1)
+
+
 if __name__ == "__main__":
 
     # GitHub Actions
@@ -465,52 +581,21 @@ if __name__ == "__main__":
     # VPS Auto Mode
     elif "--auto" in sys.argv:
 
-        # آخر دقيقة نُفِّذ فيها الفحص الكامل
-        last_full_minute = -1
+        # تشغيل الفحص الكامل في Thread مستقل
+        threading.Thread(
+            target=full_scan_scheduler,
+            daemon=True
+        ).start()
 
         while True:
 
-            now = datetime.now()
+            print(
+                f"\n{Color.CYAN}"
+                "⚡ Running Fast Scan..."
+                f"{Color.RESET}\n"
+            )
 
-            # ---------------------------------
-            # Full Scan
-            # عند 00 / 05 / 10 / 15 ...
-            # نسمح بأول 30 ثانية حتى لا يفوت الموعد
-            # ---------------------------------
-
-            if (
-                now.minute % 5 == 0
-                and now.second < 30
-                and now.minute != last_full_minute
-            ):
-
-                print(
-                    f"\n{Color.YELLOW}"
-                    "🔍 Running Full Scan (Scheduled)..."
-                    f"{Color.RESET}\n"
-                )
-
-                run_full()
-
-                last_full_minute = now.minute
-
-            # ---------------------------------
-            # Fast Scan
-            # ---------------------------------
-
-            else:
-
-                print(
-                    f"\n{Color.CYAN}"
-                    "⚡ Running Fast Scan..."
-                    f"{Color.RESET}\n"
-                )
-
-                run()
-
-            # ---------------------------------
-            # الانتظار حتى أقرب 00 أو 30 ثانية
-            # ---------------------------------
+            run()
 
             now = datetime.now()
 
