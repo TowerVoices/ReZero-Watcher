@@ -5,6 +5,7 @@ import yt_dlp
 import time
 import sys
 import random
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # تحميل متغيرات البيئة
@@ -308,14 +309,38 @@ if __name__ == "__main__":
     # GitHub Actions
     if os.getenv("GITHUB_ACTIONS") == "true":
         run()
+# VPS Auto Mode
+elif "--auto" in sys.argv:
+    while True:
+        run()
 
-    # VPS Auto Mode
-    elif "--auto" in sys.argv:
-        while True:
-            run()
-            print(f"\n{Color.CYAN}Waiting 5 minutes until next scan...{Color.RESET}\n")
-            time.sleep(300)
+        now = datetime.now()
 
+        # أقرب مضاعف لـ 5 دقائق
+        next_minute = ((now.minute // 5) + 1) * 5
+
+        if next_minute == 60:
+            target = (now + timedelta(hours=1)).replace(
+                minute=0,
+                second=0,
+                microsecond=0
+            )
+        else:
+            target = now.replace(
+                minute=next_minute,
+                second=0,
+                microsecond=0
+            )
+
+        wait = (target - datetime.now()).total_seconds()
+
+        print(
+            f"\n{Color.CYAN}"
+            f"Waiting until {target.strftime('%H:%M:%S')}..."
+            f"{Color.RESET}\n"
+        )
+
+        time.sleep(max(wait, 0))
     # Interactive Mode
     else:
         clear_screen()
