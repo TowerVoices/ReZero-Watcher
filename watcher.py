@@ -454,6 +454,7 @@ def export_ids():
             print(f"{Color.GREEN}✔ Done!{Color.RESET}")
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
+    
 if __name__ == "__main__":
 
     # GitHub Actions
@@ -464,16 +465,22 @@ if __name__ == "__main__":
     # VPS Auto Mode
     elif "--auto" in sys.argv:
 
-        # آخر دقيقة تم فيها تنفيذ الفحص الكامل
+        # آخر دقيقة نُفِّذ فيها الفحص الكامل
         last_full_minute = -1
 
         while True:
 
             now = datetime.now()
 
-            # فحص كامل عند الدقيقة 00 / 05 / 10 / 15 ...
+            # ---------------------------------
+            # Full Scan
+            # عند 00 / 05 / 10 / 15 ...
+            # نسمح بأول 30 ثانية حتى لا يفوت الموعد
+            # ---------------------------------
+
             if (
                 now.minute % 5 == 0
+                and now.second < 30
                 and now.minute != last_full_minute
             ):
 
@@ -487,6 +494,10 @@ if __name__ == "__main__":
 
                 last_full_minute = now.minute
 
+            # ---------------------------------
+            # Fast Scan
+            # ---------------------------------
+
             else:
 
                 print(
@@ -497,13 +508,27 @@ if __name__ == "__main__":
 
                 run()
 
+            # ---------------------------------
+            # الانتظار حتى أقرب 00 أو 30 ثانية
+            # ---------------------------------
+
+            now = datetime.now()
+
+            if now.second < 30:
+
+                wait = 30 - now.second
+
+            else:
+
+                wait = 60 - now.second
+
             print(
                 f"\n{Color.CYAN}"
-                "Waiting 30 seconds..."
+                f"Waiting {wait} seconds..."
                 f"{Color.RESET}\n"
             )
 
-            time.sleep(30)
+            time.sleep(wait)
 
     # Interactive Mode
     else:
