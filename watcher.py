@@ -305,8 +305,8 @@ def scan_playlist(name, url):
 def run():
 
     print(
-        f"\n{Color.BOLD}"
-        "Starting Playlist Inspection..."
+        f"\n{Color.BOLD}{Color.CYAN}"
+        "⚡ Starting Fast Playlist Inspection..."
         f"{Color.RESET}\n"
     )
 
@@ -347,6 +347,12 @@ def run():
             url
         ):
 
+            print(
+                f"{Color.YELLOW}"
+                f"⚡ Change detected in {playlist['name']}."
+                f"{Color.RESET}"
+            )
+
             # إذا تغير أول فيديو نفذ الفحص الكامل
             scan_playlist(
                 playlist["name"],
@@ -358,13 +364,12 @@ def run():
         "✔ Fast scan completed!"
         f"{Color.RESET}\n"
     )
-
-
+    
 def run_full():
 
     print(
-        f"\n{Color.BOLD}"
-        "Starting Full Playlist Inspection..."
+        f"\n{Color.BOLD}{Color.YELLOW}"
+        "🔍 Starting Full Playlist Inspection..."
         f"{Color.RESET}\n"
     )
 
