@@ -589,7 +589,7 @@ def run():
         "✔ Scan Complete."
         f"{Color.RESET}"
     )
-
+    
 # ==========================================
 # 9. Main Menu
 # ==========================================
@@ -635,6 +635,14 @@ if __name__ == "__main__":
                 )
 
             wait = (target - datetime.now()).total_seconds()
+
+            print(
+                f"\n{Color.YELLOW}"
+                f"Now    : {datetime.now().strftime('%H:%M:%S')}\n"
+                f"Target : {target.strftime('%H:%M:%S')}\n"
+                f"Wait   : {wait:.2f} seconds"
+                f"{Color.RESET}"
+            )
 
             print(
                 f"\n{Color.CYAN}"
