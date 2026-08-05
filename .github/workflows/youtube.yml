@@ -32,12 +32,12 @@ jobs:
           ${{ secrets.YOUTUBE_COOKIES }}
           EOF
 
-      - name: Run Full Watcher
+      - name: Run GitHub Watcher
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_WEBHOOK_URL_2: ${{ secrets.DISCORD_WEBHOOK_URL_2 }}
         run: |
-          python watcher_full.py
+          python watcher_github.py
 
       - name: Commit and Push Database Changes
         run: |
@@ -46,8 +46,10 @@ jobs:
 
           git add database/
 
-          git diff --cached --quiet && exit 0
+          if git diff --cached --quiet; then
+            echo "No database changes."
+            exit 0
+          fi
 
           git commit -m "Auto-update video database [skip ci]"
-
           git push
