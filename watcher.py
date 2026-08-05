@@ -454,7 +454,6 @@ def export_ids():
             print(f"{Color.GREEN}✔ Done!{Color.RESET}")
 
     print(f"\n{Color.GREEN}{Color.BOLD}✔ Export completed! File saved at: {filename}{Color.RESET}\n")
-
 if __name__ == "__main__":
 
     # GitHub Actions
@@ -464,28 +463,38 @@ if __name__ == "__main__":
 
     # VPS Auto Mode
     elif "--auto" in sys.argv:
-        
-        # متغير لتسجيل وقت آخر فحص كامل (نضع وقت قديم جداً لكي يبدأ بفحص كامل فور التشغيل)
-        last_full_scan_time = datetime.min 
+
+        # آخر دقيقة تم فيها تنفيذ الفحص الكامل
+        last_full_minute = -1
 
         while True:
+
             now = datetime.now()
 
-            # التحقق: هل مرت 5 دقائق (300 ثانية) على آخر فحص كامل؟
-            if (now - last_full_scan_time).total_seconds() >= 300:
+            # فحص كامل عند الدقيقة 00 / 05 / 10 / 15 ...
+            if (
+                now.minute % 5 == 0
+                and now.minute != last_full_minute
+            ):
+
                 print(
                     f"\n{Color.YELLOW}"
                     "🔍 Running Full Scan (Scheduled)..."
                     f"{Color.RESET}\n"
                 )
+
                 run_full()
-                last_full_scan_time = datetime.now() # تحديث وقت آخر فحص كامل
+
+                last_full_minute = now.minute
+
             else:
+
                 print(
                     f"\n{Color.CYAN}"
                     "⚡ Running Fast Scan..."
                     f"{Color.RESET}\n"
                 )
+
                 run()
 
             print(
@@ -493,6 +502,7 @@ if __name__ == "__main__":
                 "Waiting 30 seconds..."
                 f"{Color.RESET}\n"
             )
+
             time.sleep(30)
 
     # Interactive Mode
