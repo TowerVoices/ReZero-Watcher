@@ -364,13 +364,18 @@ def run():
         "✔ Fast scan completed!"
         f"{Color.RESET}\n"
     )
-    
 def run_full():
 
     print(
         f"\n{Color.BOLD}{Color.YELLOW}"
         "🔍 Starting Full Playlist Inspection..."
         f"{Color.RESET}\n"
+    )
+
+    print(
+        f"{Color.CYAN}"
+        f"FULL START : {datetime.now().strftime('%H:%M:%S')}"
+        f"{Color.RESET}"
     )
 
     watchlist = load_watchlist()
@@ -410,11 +415,16 @@ def run_full():
         )
 
     print(
+        f"{Color.CYAN}"
+        f"FULL END   : {datetime.now().strftime('%H:%M:%S')}"
+        f"{Color.RESET}"
+    )
+
+    print(
         f"\n{Color.GREEN}{Color.BOLD}"
         "✔ Full scan completed!"
         f"{Color.RESET}\n"
     )
-
 
 def export_ids():
     watchlist = load_watchlist()
@@ -465,26 +475,28 @@ if __name__ == "__main__":
     # VPS Auto Mode
     elif "--auto" in sys.argv:
 
-        fast_counter = 0
-
         while True:
 
-            fast_counter += 1
+            now = datetime.now()
 
-            # كل 5 دقائق (10 × 30 ثانية)
-            if fast_counter >= 10:
+            # فحص كامل عند الدقيقة 00 / 05 / 10 / ...
+            if now.minute % 5 == 0 and now.second < 30:
 
                 print(
                     f"\n{Color.YELLOW}"
-                    "Running Full Scan..."
+                    "🔍 Running Full Scan..."
                     f"{Color.RESET}\n"
                 )
 
                 run_full()
 
-                fast_counter = 0
-
             else:
+
+                print(
+                    f"\n{Color.CYAN}"
+                    "⚡ Running Fast Scan..."
+                    f"{Color.RESET}\n"
+                )
 
                 run()
 
