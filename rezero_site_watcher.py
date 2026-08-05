@@ -6,7 +6,7 @@ import time
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from extractors.story import parse_story
-from extractors.news import parse_news_with_details
+from extractors.news import parse_news, parse_news_with_details
 # ==========================================
 # 1. Load Environment
 # ==========================================
@@ -521,7 +521,6 @@ Link: {news["url"]}
             f"{Color.RESET}"
         )
 
-
 def check_news():
 
     print(
@@ -538,6 +537,35 @@ def check_news():
 
         return
 
+    # فحص خفيف (آخر خبر فقط)
+    latest = parse_news()
+
+    # لا يوجد أخبار
+    if not latest:
+
+        print(
+            f"{Color.GREEN}"
+            "No news found."
+            f"{Color.RESET}"
+        )
+
+        return
+
+    # إذا لم يتغير آخر خبر فلا داعي لجلب التفاصيل
+    if (
+        database
+        and database[0]["id"] == latest[0]["id"]
+    ):
+
+        print(
+            f"{Color.GREEN}"
+            "✓ No new news."
+            f"{Color.RESET}"
+        )
+
+        return
+
+    # يوجد خبر جديد → اجلب التفاصيل
     current = parse_news_with_details()
 
     compare_news(
@@ -589,8 +617,8 @@ def run():
         "✔ Scan Complete."
         f"{Color.RESET}"
     )
-    
-# ==========================================
+
+ # ==========================================
 # 9. Main Menu
 # ==========================================
 if __name__ == "__main__":
@@ -613,44 +641,19 @@ if __name__ == "__main__":
 
             run()
 
-            now = datetime.now()
-
-            # أقرب مضاعف لـ 5 دقائق
-            next_minute = ((now.minute // 5) + 1) * 5
-
-            if next_minute == 60:
-
-                target = (now + timedelta(hours=1)).replace(
-                    minute=0,
-                    second=0,
-                    microsecond=0
-                )
-
-            else:
-
-                target = now.replace(
-                    minute=next_minute,
-                    second=0,
-                    microsecond=0
-                )
-
-            wait = (target - datetime.now()).total_seconds()
-
             print(
                 f"\n{Color.YELLOW}"
-                f"Now    : {datetime.now().strftime('%H:%M:%S')}\n"
-                f"Target : {target.strftime('%H:%M:%S')}\n"
-                f"Wait   : {wait:.2f} seconds"
+                f"Last Scan : {datetime.now().strftime('%H:%M:%S')}"
                 f"{Color.RESET}"
             )
 
             print(
                 f"\n{Color.CYAN}"
-                f"Waiting until {target.strftime('%H:%M:%S')}..."
+                "Waiting 30 seconds until next scan..."
                 f"{Color.RESET}\n"
             )
 
-            time.sleep(max(wait, 0))
+            time.sleep(30)
 
     # ---------------------------------
     # Interactive Mode

@@ -12,7 +12,7 @@ HEADERS = {
     )
 }
 
-NEWS_LIMIT = 5
+NEWS_LIMIT = 1
 
 def get_news_page():
 

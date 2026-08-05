@@ -138,6 +138,61 @@ def check_video_status(video_id):
 
         return "Unknown Error"
 
+def scan_playlist_fast(name, url):
+
+    old = load_database(name)
+
+    if not old:
+        return True
+
+    try:
+
+        opts = YTDLP_OPTS.copy()
+        opts["playlistend"] = 1
+
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        entries = info.get("entries", [])
+
+        if not entries:
+            return False
+
+        latest_id = entries[0].get("id")
+
+        if not latest_id:
+            return False
+
+        if latest_id == old[0]["id"]:
+
+            print(
+                f"{Color.BLUE}"
+                f"✓ {name}: First video unchanged."
+                f"{Color.RESET}"
+            )
+
+            return False
+
+        print(
+            f"{Color.YELLOW}"
+            f"⚡ {name}: First video changed."
+            f"{Color.RESET}"
+        )
+
+        return True
+
+    except Exception as e:
+
+        print(
+            f"{Color.RED}"
+            f"Fast Scan Failed ({name}): {e}"
+            f"{Color.RESET}"
+        )
+
+        return True
+
+
+
 def scan_playlist(name, url):
     print(f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} {Color.BOLD}{name}{Color.RESET} ... \n", end="", flush=True)
 
@@ -248,23 +303,113 @@ def scan_playlist(name, url):
     save_database(name, current)
 
 def run():
-    print(f"\n{Color.BOLD}Starting Playlist Inspection...{Color.RESET}\n")
-    # تم إزالة إشعار البدء المزعج ليعمل بصمت تام
-    
+
+    print(
+        f"\n{Color.BOLD}"
+        "Starting Playlist Inspection..."
+        f"{Color.RESET}\n"
+    )
+
     watchlist = load_watchlist()
-    playlists = watchlist.get("youtube_playlists", [])
+
+    playlists = watchlist.get(
+        "youtube_playlists",
+        []
+    )
 
     if not playlists:
-        print(f"{Color.YELLOW}⚠ No playlists found in watchlist.json.{Color.RESET}")
+
+        print(
+            f"{Color.YELLOW}"
+            "⚠ No playlists found in watchlist.json."
+            f"{Color.RESET}"
+        )
+
         return
 
     for playlist in playlists:
-        playlist_id = playlist.get("playlist_id")
-        if not playlist_id: continue
-        url = f"https://www.youtube.com/playlist?list={playlist_id}"
-        scan_playlist(playlist["name"], url)
 
-    print(f"\n{Color.GREEN}{Color.BOLD}✔ All playlists scanned successfully!{Color.RESET}\n")
+        playlist_id = playlist.get(
+            "playlist_id"
+        )
+
+        if not playlist_id:
+            continue
+
+        url = (
+            f"https://www.youtube.com/"
+            f"playlist?list={playlist_id}"
+        )
+
+        # فحص سريع
+        if scan_playlist_fast(
+            playlist["name"],
+            url
+        ):
+
+            # إذا تغير أول فيديو نفذ الفحص الكامل
+            scan_playlist(
+                playlist["name"],
+                url
+            )
+
+    print(
+        f"\n{Color.GREEN}{Color.BOLD}"
+        "✔ Fast scan completed!"
+        f"{Color.RESET}\n"
+    )
+
+
+def run_full():
+
+    print(
+        f"\n{Color.BOLD}"
+        "Starting Full Playlist Inspection..."
+        f"{Color.RESET}\n"
+    )
+
+    watchlist = load_watchlist()
+
+    playlists = watchlist.get(
+        "youtube_playlists",
+        []
+    )
+
+    if not playlists:
+
+        print(
+            f"{Color.YELLOW}"
+            "⚠ No playlists found."
+            f"{Color.RESET}"
+        )
+
+        return
+
+    for playlist in playlists:
+
+        playlist_id = playlist.get(
+            "playlist_id"
+        )
+
+        if not playlist_id:
+            continue
+
+        url = (
+            f"https://www.youtube.com/"
+            f"playlist?list={playlist_id}"
+        )
+
+        scan_playlist(
+            playlist["name"],
+            url
+        )
+
+    print(
+        f"\n{Color.GREEN}{Color.BOLD}"
+        "✔ Full scan completed!"
+        f"{Color.RESET}\n"
+    )
+
 
 def export_ids():
     watchlist = load_watchlist()
@@ -309,42 +454,42 @@ if __name__ == "__main__":
 
     # GitHub Actions
     if os.getenv("GITHUB_ACTIONS") == "true":
-        run()
+
+        run_full()
 
     # VPS Auto Mode
     elif "--auto" in sys.argv:
 
+        fast_counter = 0
+
         while True:
 
-            run()
+            fast_counter += 1
 
-            now = datetime.now()
+            # كل 5 دقائق (10 × 30 ثانية)
+            if fast_counter >= 10:
 
-            # أقرب مضاعف لـ 5 دقائق
-            next_minute = ((now.minute // 5) + 1) * 5
-
-            if next_minute == 60:
-                target = (now + timedelta(hours=1)).replace(
-                    minute=0,
-                    second=0,
-                    microsecond=0
+                print(
+                    f"\n{Color.YELLOW}"
+                    "Running Full Scan..."
+                    f"{Color.RESET}\n"
                 )
+
+                run_full()
+
+                fast_counter = 0
+
             else:
-                target = now.replace(
-                    minute=next_minute,
-                    second=0,
-                    microsecond=0
-                )
 
-            wait = (target - datetime.now()).total_seconds()
+                run()
 
             print(
                 f"\n{Color.CYAN}"
-                f"Waiting until {target.strftime('%H:%M:%S')}..."
+                "Waiting 30 seconds..."
                 f"{Color.RESET}\n"
             )
 
-            time.sleep(max(wait, 0))
+            time.sleep(30)
 
     # Interactive Mode
     else:
@@ -366,22 +511,39 @@ if __name__ == "__main__":
             ).strip()
 
             if choice == "1":
-                run()
+
+                run_full()
+
                 input(
                     f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}"
                 )
+
                 clear_screen()
 
             elif choice == "2":
+
                 export_ids()
+
                 input(
                     f"\n{Color.CYAN}Press Enter to return to main menu...{Color.RESET}"
                 )
+
                 clear_screen()
 
             elif choice == "3":
-                print(f"\n{Color.GREEN}Exiting... Goodbye! 👋{Color.RESET}")
+
+                print(
+                    f"\n{Color.GREEN}"
+                    "Exiting... Goodbye! 👋"
+                    f"{Color.RESET}"
+                )
+
                 break
 
             else:
-                print(f"{Color.RED}\n✖ Invalid choice. Please try again.\n{Color.RESET}")
+
+                print(
+                    f"{Color.RED}\n"
+                    "✖ Invalid choice. Please try again.\n"
+                    f"{Color.RESET}"
+                )
