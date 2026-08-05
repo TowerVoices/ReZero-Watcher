@@ -84,6 +84,7 @@ def send_discord(message):
                 print(r.text)
         except Exception as e:
             print("Discord Exception:", e)
+            
 def load_watchlist():
 
     if not os.path.exists(WATCHLIST):
@@ -114,17 +115,15 @@ def load_database(name):
 
         return []
 
-    with database_lock:
+    with open(path, "r", encoding="utf-8") as f:
 
-        with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-            data = json.load(f)
-
-            return [
-                x for x in data
-                if isinstance(x, dict)
-                and "id" in x
-            ]
+        return [
+            x for x in data
+            if isinstance(x, dict)
+            and "id" in x
+        ]
 
 
 def save_database(name, data):
@@ -136,18 +135,15 @@ def save_database(name, data):
         f"{name}.json"
     )
 
-    with database_lock:
+    with open(path, "w", encoding="utf-8") as f:
 
-        with open(path, "w", encoding="utf-8") as f:
-
-            json.dump(
-                data,
-                f,
-                indent=4,
-                ensure_ascii=False
-            )
-
-
+        json.dump(
+            data,
+            f,
+            indent=4,
+            ensure_ascii=False
+        )
+        
 def check_video_status(video_id):
 
     global cookies_alert_sent
