@@ -364,18 +364,13 @@ def run():
         "✔ Fast scan completed!"
         f"{Color.RESET}\n"
     )
+
 def run_full():
 
     print(
         f"\n{Color.BOLD}{Color.YELLOW}"
         "🔍 Starting Full Playlist Inspection..."
         f"{Color.RESET}\n"
-    )
-
-    print(
-        f"{Color.CYAN}"
-        f"FULL START : {datetime.now().strftime('%H:%M:%S')}"
-        f"{Color.RESET}"
     )
 
     watchlist = load_watchlist()
@@ -415,16 +410,11 @@ def run_full():
         )
 
     print(
-        f"{Color.CYAN}"
-        f"FULL END   : {datetime.now().strftime('%H:%M:%S')}"
-        f"{Color.RESET}"
-    )
-
-    print(
         f"\n{Color.GREEN}{Color.BOLD}"
         "✔ Full scan completed!"
         f"{Color.RESET}\n"
     )
+
 
 def export_ids():
     watchlist = load_watchlist()
@@ -474,30 +464,28 @@ if __name__ == "__main__":
 
     # VPS Auto Mode
     elif "--auto" in sys.argv:
+        
+        # متغير لتسجيل وقت آخر فحص كامل (نضع وقت قديم جداً لكي يبدأ بفحص كامل فور التشغيل)
+        last_full_scan_time = datetime.min 
 
         while True:
-
             now = datetime.now()
 
-            # فحص كامل عند الدقيقة 00 / 05 / 10 / ...
-            if now.minute % 5 == 0 and now.second < 30:
-
+            # التحقق: هل مرت 5 دقائق (300 ثانية) على آخر فحص كامل؟
+            if (now - last_full_scan_time).total_seconds() >= 300:
                 print(
                     f"\n{Color.YELLOW}"
-                    "🔍 Running Full Scan..."
+                    "🔍 Running Full Scan (Scheduled)..."
                     f"{Color.RESET}\n"
                 )
-
                 run_full()
-
+                last_full_scan_time = datetime.now() # تحديث وقت آخر فحص كامل
             else:
-
                 print(
                     f"\n{Color.CYAN}"
                     "⚡ Running Fast Scan..."
                     f"{Color.RESET}\n"
                 )
-
                 run()
 
             print(
@@ -505,7 +493,6 @@ if __name__ == "__main__":
                 "Waiting 30 seconds..."
                 f"{Color.RESET}\n"
             )
-
             time.sleep(30)
 
     # Interactive Mode
