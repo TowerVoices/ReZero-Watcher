@@ -313,8 +313,8 @@ if __name__ == "__main__":
     elif "--auto" in sys.argv:
         while True:
             run()
-            print(f"\n{Color.CYAN}Waiting 10 minutes until next scan...{Color.RESET}\n")
-            time.sleep(600)
+            print(f"\n{Color.CYAN}Waiting 5 minutes until next scan...{Color.RESET}\n")
+            time.sleep(300)
 
     # Interactive Mode
     else:
