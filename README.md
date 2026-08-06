@@ -184,8 +184,114 @@ The project also supports automatic cloud monitoring through GitHub Actions.
 Once these secrets have been added, no additional configuration is required.
 
 ---
+## 11. 🖥️ VPS Deployment
 
-## 11. 👨‍💻 Author
+The project supports continuous monitoring using **three systemd services**.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/TowerVoices/ReZero-Watcher.git
+cd ReZero-Watcher
+```
+
+### 2. Install dependencies
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### 3. Configure the environment
+
+Create a `.env` file:
+
+```env
+DISCORD_WEBHOOK_URL=YOUR_WEBHOOK
+DISCORD_WEBHOOK_URL_2=YOUR_SECOND_WEBHOOK
+```
+
+Copy your `cookies.txt` into the project root.
+
+### 4. Create the services
+
+Create the following systemd services:
+
+- `rezero-fast.service`
+- `rezero-full.service`
+- `rezero-site.service`
+
+Reload systemd:
+
+```bash
+sudo systemctl daemon-reload
+```
+
+Enable all services:
+
+```bash
+sudo systemctl enable rezero-fast
+sudo systemctl enable rezero-full
+sudo systemctl enable rezero-site
+```
+
+Start all services:
+
+```bash
+sudo systemctl start rezero-fast
+sudo systemctl start rezero-full
+sudo systemctl start rezero-site
+```
+
+### 5. Useful Commands
+
+Check service status:
+
+```bash
+sudo systemctl status rezero-fast
+sudo systemctl status rezero-full
+sudo systemctl status rezero-site
+```
+
+Restart services:
+
+```bash
+sudo systemctl restart rezero-fast
+sudo systemctl restart rezero-full
+sudo systemctl restart rezero-site
+```
+
+View logs:
+
+```bash
+journalctl -u rezero-fast -f -o short-precise
+```
+
+```bash
+journalctl -u rezero-full -f -o short-precise
+```
+
+```bash
+journalctl -u rezero-site -f -o short-precise
+```
+
+Update the project:
+
+```bash
+cd /root/ReZero-Watcher
+
+git pull
+
+sudo systemctl restart rezero-fast
+sudo systemctl restart rezero-full
+sudo systemctl restart rezero-site
+```
+
+---
+
+## 12. 👨‍💻 Author
 
 **TowerVoices**
 
