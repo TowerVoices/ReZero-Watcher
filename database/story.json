@@ -1,30 +1,30 @@
 [
     {
-        "episode": 80,
-        "title": "五つの障害",
-        "hero_image": "https://re-zero-anime.jp/tv/assets/episode/80/1.webp",
+        "episode": 81,
+        "title": "一途な星",
+        "hero_image": "https://re-zero-anime.jp/tv/assets/episode/81/1.webp",
         "gallery": [
-            "https://re-zero-anime.jp/tv/assets/episode/80/2.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/3.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/4.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/5.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/6.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/7.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/8.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/9.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/10.webp"
+            "https://re-zero-anime.jp/tv/assets/episode/81/2.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/3.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/4.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/5.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/6.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/7.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/8.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/9.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/10.webp"
         ],
         "images": [
-            "https://re-zero-anime.jp/tv/assets/episode/80/1.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/2.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/3.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/4.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/5.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/6.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/7.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/8.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/9.webp",
-            "https://re-zero-anime.jp/tv/assets/episode/80/10.webp"
+            "https://re-zero-anime.jp/tv/assets/episode/81/1.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/2.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/3.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/4.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/5.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/6.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/7.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/8.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/9.webp",
+            "https://re-zero-anime.jp/tv/assets/episode/81/10.webp"
         ],
         "episodes": [
             67,
@@ -40,7 +40,8 @@
             77,
             78,
             79,
-            80
+            80,
+            81
         ]
     }
 ]
