@@ -15,6 +15,10 @@ load_dotenv()
 WATCHLIST = "watchlist.json"
 DATABASE = "database"
 
+# Only these values are treated as confirmed visibility states.
+CONFIRMED_STATUSES = {"Public", "Private", "Members"}
+STATUS_RECORD_VERSION = 3  # Baseline created by strict, single-pass status checks.
+
 cookies_alert_sent = False
 
 # ==========================================
@@ -145,79 +149,98 @@ def save_database(name, data):
         )
         
 def check_video_status(video_id):
-
+    """Return a confirmed visibility status, or an uncertainty state."""
     global cookies_alert_sent
 
     single_opts = YTDLP_OPTS.copy()
-
     single_opts["extract_flat"] = False
 
     try:
-
         with yt_dlp.YoutubeDL(single_opts) as ydl:
-
-            ydl.extract_info(
+            info = ydl.extract_info(
                 f"https://youtu.be/{video_id}",
                 download=False
             )
 
+        # yt-dlp may expose an explicit availability value.
+        availability = str((info or {}).get("availability") or "").lower()
+
+        if availability == "private":
+            return "Private"
+        if availability in {"subscriber_only", "premium_only"}:
+            return "Members"
+        if availability in {"public", "unlisted"}:
+            return "Public"
+        if availability == "needs_auth":
+            # Authentication/age restrictions are not proof of privacy.
+            print(
+                f"\n   {Color.YELLOW}yt-dlp availability=needs_auth; "
+                f"visibility is not confirmed.{Color.RESET}"
+            )
+            return "Unknown Error"
+
+        # A successful single-video extraction with no restrictive marker
+        # is treated as Public, matching the original script's behavior.
         return "Public"
 
     except Exception as e:
-
-        text = str(e).lower()
+        error = " ".join(str(e).lower().split())
 
         if (
-            "sign in to confirm you're not a bot" in text
-            or "cookie file is not in netscape format" in text
-            or "cookies are no longer valid" in text
+            "sign in to confirm you're not a bot" in error
+            or "sign in to confirm you’re not a bot" in error
+            or "cookie file is not in netscape format" in error
+            or "cookies are no longer valid" in error
         ):
-
             if not cookies_alert_sent:
-
                 send_discord(
                     "@everyone 🚨 **YouTube Session Expired / Bot Detected**\n\n"
-                    "The current session is blocked by CAPTCHA or expired.\n"
+                    "The current session is blocked or expired.\n"
                     "Please update your YOUTUBE_COOKIES."
                 )
-
                 cookies_alert_sent = True
 
             return "Cookies Expired"
 
-        if "private" in text:
-
+        # YouTube/yt-dlp's explicit private-video denial is a specific
+        # message. Never infer privacy from a generic occurrence of
+        # the word "private" (for example, in unrelated request/error text).
+        # A successful metadata response with availability="private" is
+        # handled above; here accept only the canonical denial phrase.
+        if (
+            "private video. sign in if you've been granted access to this video" in error
+            or "private video. sign in if you have been granted access to this video" in error
+        ):
             return "Private"
 
-        elif (
-            "unavailable" in text
-            or "copyright" in text
-            or "country" in text
-            or "age-restricted" in text
-            or "login required" in text
+        if (
+            "members-only" in error
+            or "members only" in error
+            or "available to this channel's members" in error
         ):
-
-            return "Unavailable"
-
-        elif "members" in text:
-
             return "Members"
 
-        elif (
-            "429" in text
-            or "too many requests" in text
-        ):
-
+        if "429" in error or "too many requests" in error:
             return "Rate Limited"
 
-        elif (
-            "network" in text
-            or "timeout" in text
-            or "urlopen error" in text
+        if (
+            "network" in error
+            or "timeout" in error
+            or "urlopen error" in error
+            or "http error 403" in error
+            or "http error 500" in error
+            or "http error 502" in error
+            or "http error 503" in error
         ):
-
             return "Network Error"
 
+        # Geo-blocks, age gates, copyright blocks, and generic unavailable
+        # errors do not establish Public/Private visibility. Print the cause
+        # so an Unknown result can be diagnosed from the Actions log.
+        print(
+            f"\n   {Color.YELLOW}Unconfirmed yt-dlp response for "
+            f"{video_id}: {error[:240]}{Color.RESET}"
+        )
         return "Unknown Error"
 
 def scan_playlist_fast(name, url):
@@ -276,10 +299,16 @@ def scan_playlist_fast(name, url):
 
 
 def scan_playlist(name, url):
-    print(f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} {Color.BOLD}{name}{Color.RESET} ... \n", end="", flush=True)
+    print(
+        f"{Color.CYAN}➤ Scanning Playlist:{Color.RESET} "
+        f"{Color.BOLD}{name}{Color.RESET} ...\n",
+        end="",
+        flush=True
+    )
 
     old = load_database(name)
-    old_ids = {x["id"] for x in old}
+    old_by_id = {item["id"]: item for item in old}
+    old_ids = set(old_by_id)
     current = []
 
     try:
@@ -289,9 +318,10 @@ def scan_playlist(name, url):
         if "entries" not in info:
             raise Exception("Playlist has no entries.")
 
-        total_videos = len(info["entries"])
-        
-        for index, entry in enumerate(info["entries"]):
+        entries = info["entries"]
+        total_videos = len(entries)
+
+        for index, entry in enumerate(entries):
             video_id = entry.get("id")
             if not video_id:
                 continue
@@ -300,86 +330,170 @@ def scan_playlist(name, url):
             if not title or str(title).strip() == "":
                 title = "Unknown Title"
 
-            print(f" ⏳ Checking ({index+1}/{total_videos}): {video_id} ... ", end="", flush=True)
+            print(
+                f" ⏳ Checking ({index + 1}/{total_videos}): {video_id} ... ",
+                end="",
+                flush=True
+            )
 
-            old_video_data = next((x for x in old if x["id"] == video_id), None)
+            old_video_data = old_by_id.get(video_id)
+            old_status = (old_video_data or {}).get("status", "Unknown")
+            has_trusted_baseline = (
+                old_video_data is not None
+                and old_video_data.get("status_version") == STATUS_RECORD_VERSION
+                and old_status in CONFIRMED_STATUSES
+            )
 
-            # --- التخطي الذكي للفيديوهات العامة ---
-            if old_video_data and old_video_data.get("status") == "Public":
-                status = "Public"
-                if old_video_data.get("title") and old_video_data.get("title") != "Unknown Title":
-                    title = old_video_data.get("title")
-                print(f"[{Color.GREEN}{status}{Color.RESET}] (Skipped - Already Public)")
-            else:
-                status = check_video_status(video_id)
+            # Check every video, including previously Public ones.
+            detected_status = check_video_status(video_id)
 
-                if status == "Cookies Expired":
-                    print(f"{Color.RED}Bot Blocked! Scan aborted.{Color.RESET}")
-                    return
+            if detected_status == "Cookies Expired":
+                print(f"{Color.RED}Bot Blocked! Scan aborted; database not updated.{Color.RESET}")
+                return
 
-                if status in ["Rate Limited", "Network Error", "Unknown Error"]:
-                    if old_video_data:
-                        status = old_video_data.get("status", status)
-                    else:
-                        status = "Unknown" 
+            if detected_status not in CONFIRMED_STATUSES:
+                # Preserve only a baseline created by this strict checker.
+                # Legacy/unverified Private values are not evidence and are
+                # cleared to Unknown until a fresh status can be established.
+                if has_trusted_baseline:
+                    status = old_status
+                    status_version = STATUS_RECORD_VERSION
+                    print(f"[{status}] (Unconfirmed check; trusted previous state preserved)")
+                else:
+                    status = "Unknown"
+                    status_version = 1
+                    print("[Unknown] (Unconfirmed check; discarded unverified legacy state)")
 
+            elif not has_trusted_baseline:
+                # One-time migration: old records did not record whether their
+                # state came from a reliable check. Establish a fresh baseline
+                # silently instead of reporting e.g. a false Private -> Public.
+                status = detected_status
+                status_version = STATUS_RECORD_VERSION
+                if old_video_data:
+                    print(
+                        f"[{status}] (Baseline reset; ignored unverified old state: "
+                        f"{old_status})"
+                    )
+                else:
+                    print(f"[{status}] (Baseline established)")
+
+            elif detected_status == old_status:
+                status = detected_status
+                status_version = STATUS_RECORD_VERSION
                 print(f"[{status}]")
 
-                if index < total_videos - 1:
-                    sleep_time = random.uniform(3, 6)
-                    time.sleep(sleep_time)
+            else:
+                # One successful, explicit result is enough. Do not issue a
+                # second request: the root protection is strict classification
+                # in check_video_status(), not repeated scanning.
+                status = detected_status
+                status_version = STATUS_RECORD_VERSION
+                print(f"[{status}] (Confirmed status change)")
+
+            # Retain the previous good title if the playlist response omits it.
+            if (
+                (not title or title == "Unknown Title")
+                and old_video_data
+                and old_video_data.get("title")
+            ):
+                title = old_video_data["title"]
 
             current.append({
                 "id": video_id,
                 "title": title,
-                "status": status
+                "status": status,
+                "status_version": status_version,
             })
 
+            if index < total_videos - 1:
+                time.sleep(random.uniform(3, 6))
+
     except Exception as e:
-        print(f"{Color.RED}Failed!{Color.RESET}")
+        print(f"{Color.RED}Failed! Database not updated.{Color.RESET}")
         print(e)
-        send_discord(f"❌ **Playlist Scan Failed**\n\n**Playlist:** {name}\n\n**Reason:**\n```{e}```")
+        send_discord(
+            f"❌ **Playlist Scan Failed**\n\n"
+            f"**Playlist:** {name}\n\n"
+            f"**Reason:**\n```{e}```"
+        )
         return
 
     print(f"\n{Color.GREEN}Done! ({len(current)} videos){Color.RESET}\n")
 
-    new_ids = {x["id"] for x in current}
+    new_ids = {item["id"] for item in current}
     changes = 0
 
-    # 1. فيديوهات جديدة
+    # 1. New videos.
     for video in current:
         if video["id"] not in old_ids:
             changes += 1
-            safe_title = str(video.get('title') or 'Unknown Title')
-            print(f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} {safe_title[:50]}... ({video['status']})")
-            send_discord(f"@everyone 🟢 **New Video**\n\n**Playlist:** {name}\n**Status:** {video['status']}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
+            safe_title = str(video.get("title") or "Unknown Title")
+            print(
+                f"  {Color.GREEN}[+] NEW VIDEO:{Color.RESET} "
+                f"{safe_title[:50]}... ({video['status']})"
+            )
+            send_discord(
+                f"@everyone 🟢 **New Video**\n\n"
+                f"**Playlist:** {name}\n"
+                f"**Status:** {video['status']}\n\n"
+                f"**Title:**\n{safe_title}\n\n"
+                f"**ID:**\n{video['id']}\n\n"
+                f"https://youtu.be/{video['id']}"
+            )
 
-    # 2. تغير الحالة (مثلاً من Private إلى Public أو العكس)
+    # 2. Visibility changes are reported only when BOTH states are confirmed.
     for video in current:
-        old_video = next((x for x in old if x["id"] == video["id"]), None)
-        if not old_video: continue
+        old_video = old_by_id.get(video["id"])
+        if not old_video:
+            continue
 
         old_status = old_video.get("status", "Unknown")
         new_status = video["status"]
 
-        if old_status != new_status:
+        if (
+            old_video.get("status_version") == STATUS_RECORD_VERSION
+            and video.get("status_version") == STATUS_RECORD_VERSION
+            and old_status in CONFIRMED_STATUSES
+            and new_status in CONFIRMED_STATUSES
+            and old_status != new_status
+        ):
             changes += 1
-            safe_title = str(video.get('title') or 'Unknown Title')
-            print(f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} {safe_title[:50]}... [{old_status} ➜ {new_status}]")
-            send_discord(f"@everyone 🟡 **Video Status Changed**\n\n**Playlist:** {name}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\n**Status:**\n{old_status} ➜ {new_status}\n\nhttps://youtu.be/{video['id']}")
+            safe_title = str(video.get("title") or "Unknown Title")
+            print(
+                f"  {Color.YELLOW}[~] STATUS CHANGED:{Color.RESET} "
+                f"{safe_title[:50]}... [{old_status} ➜ {new_status}]"
+            )
+            send_discord(
+                f"@everyone 🟡 **Video Status Changed**\n\n"
+                f"**Playlist:** {name}\n\n"
+                f"**Title:**\n{safe_title}\n\n"
+                f"**ID:**\n{video['id']}\n\n"
+                f"**Status:**\n{old_status} ➜ {new_status}\n\n"
+                f"https://youtu.be/{video['id']}"
+            )
 
-    # 3. فيديوهات محذوفة / مخفية تماماً من القائمة
+    # 3. Videos missing from a successfully retrieved playlist.
     for video in old:
         if video["id"] not in new_ids:
             changes += 1
-            safe_title = str(video.get('title') or 'Unknown Title')
-            old_status = video.get('status', 'Unknown')
-            
-            print(f"  {Color.RED}[-] REMOVED:{Color.RESET} {safe_title[:50]}... (Was: {old_status})")
-            send_discord(f"@everyone 🔴 **Video Removed**\n\n**Playlist:** {name}\n\n**Last Status:** {old_status}\n\n**Title:**\n{safe_title}\n\n**ID:**\n{video['id']}\n\nhttps://youtu.be/{video['id']}")
+            safe_title = str(video.get("title") or "Unknown Title")
+            old_status = video.get("status", "Unknown")
+            print(
+                f"  {Color.RED}[-] REMOVED:{Color.RESET} "
+                f"{safe_title[:50]}... (Was: {old_status})"
+            )
+            send_discord(
+                f"@everyone 🔴 **Video Removed**\n\n"
+                f"**Playlist:** {name}\n\n"
+                f"**Last Status:** {old_status}\n\n"
+                f"**Title:**\n{safe_title}\n\n"
+                f"**ID:**\n{video['id']}\n\n"
+                f"https://youtu.be/{video['id']}"
+            )
 
     if changes == 0:
-        print(f"  {Color.BLUE}✓ No changes detected.{Color.RESET}")
+        print(f"  {Color.BLUE}✓ No confirmed changes detected.{Color.RESET}")
 
     print("-" * 50)
     save_database(name, current)
