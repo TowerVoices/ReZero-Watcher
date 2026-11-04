@@ -32,6 +32,77 @@ jobs:
           ${{ secrets.YOUTUBE_COOKIES }}
           EOF
 
+      - name: Verify YouTube cookies
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("cookies.txt")
+
+          if not path.exists() or path.stat().st_size == 0:
+              raise SystemExit("ERROR: cookies.txt is missing or empty")
+
+          auth_candidates = {
+              "LOGIN_INFO",
+              "SAPISID",
+              "APISID",
+              "__Secure-1PSID",
+              "__Secure-3PSID",
+              "__Secure-1PAPISID",
+              "__Secure-3PAPISID",
+              "SID",
+              "HSID",
+              "SSID",
+          }
+
+          valid_records = 0
+          auth_cookie_found = False
+
+          for line in path.read_text(encoding="utf-8").splitlines():
+              if not line:
+                  continue
+
+              if line.startswith("#") and not line.startswith("#HttpOnly_"):
+                  continue
+
+              parts = line.split("\t")
+
+              if len(parts) != 7:
+                  continue
+
+              domain = parts[0].removeprefix("#HttpOnly_")
+              domain = domain.lstrip(".").lower()
+
+              if not (
+                  domain == "youtube.com"
+                  or domain.endswith(".youtube.com")
+                  or domain == "google.com"
+                  or domain.endswith(".google.com")
+              ):
+                  continue
+
+              valid_records += 1
+
+              cookie_name = parts[5]
+              cookie_value = parts[6]
+
+              if cookie_name in auth_candidates and cookie_value:
+                  auth_cookie_found = True
+
+          print("Cookie file exists and is not empty: YES")
+          print("Valid YouTube/Google cookie records:", valid_records)
+          print("Authentication cookie found:", auth_cookie_found)
+
+          if valid_records == 0:
+              raise SystemExit("ERROR: No valid YouTube/Google cookie records found")
+
+          if not auth_cookie_found:
+              raise SystemExit("ERROR: No recognized authentication cookie found")
+
+          print("Cookie structure check passed.")
+          PY
+
       - name: Run GitHub Watcher
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
