@@ -155,6 +155,16 @@ def check_video_status(video_id):
     single_opts = YTDLP_OPTS.copy()
     single_opts["extract_flat"] = False
 
+    # YouTube's default logged-in player client may expose only separate
+    # audio/video formats (or no default combined format). The Android
+    # client is a compatibility fallback for metadata extraction here.
+    # This affects only the single-video status check, not playlist listing.
+    single_opts["extractor_args"] = {
+        "youtube": {
+            "player_client": ["android"]
+        }
+    }
+
     try:
         with yt_dlp.YoutubeDL(single_opts) as ydl:
             info = ydl.extract_info(
